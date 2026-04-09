@@ -1,0 +1,130 @@
+name: Blue Team Script CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Job 1: Lint all shell scripts with ShellCheck
+  # ──────────────────────────────────────────────────────────────
+  shellcheck:
+    name: ShellCheck Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ubuntu:22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends shellcheck
+
+      - name: Lint scripts/
+        run: |
+          echo "=== Linting scripts/ ==="
+          shellcheck --severity=warning scripts/*.sh
+
+      - name: Lint tests/
+        run: |
+          echo "=== Linting tests/ ==="
+          shellcheck --severity=warning tests/*.sh
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 2: Run the test suite inside a Linux container
+  # ──────────────────────────────────────────────────────────────
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: shellcheck
+    permissions:
+      contents: read
+    container:
+      image: ubuntu:22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install runtime dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            iproute2 \
+            procps \
+            cron
+
+      - name: Make all scripts executable
+        run: chmod +x scripts/*.sh tests/*.sh
+
+      - name: Test – check_open_ports
+        run: bash tests/test_check_open_ports.sh
+
+      - name: Test – check_failed_logins
+        run: bash tests/test_check_failed_logins.sh
+
+      - name: Test – check_file_integrity
+        run: bash tests/test_check_file_integrity.sh
+
+      - name: Test – check_processes
+        run: bash tests/test_check_processes.sh
+
+      - name: Test – check_crontabs
+        run: bash tests/test_check_crontabs.sh
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 3: Smoke-run every script to confirm zero-error execution
+  # ──────────────────────────────────────────────────────────────
+  smoke:
+    name: Smoke Run Scripts
+    runs-on: ubuntu-latest
+    needs: shellcheck
+    permissions:
+      contents: read
+    container:
+      image: ubuntu:22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install runtime dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            iproute2 \
+            procps \
+            cron
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Smoke – check_open_ports (no args)
+        run: bash scripts/check_open_ports.sh
+
+      - name: Smoke – check_processes (no args)
+        run: bash scripts/check_processes.sh
+
+      - name: Smoke – check_crontabs
+        run: bash scripts/check_crontabs.sh
+
+      - name: Smoke – check_file_integrity (generate + verify)
+        run: |
+          TMPDIR_SMOKE="$(mktemp -d)"
+          echo "sample" > "$TMPDIR_SMOKE/file.txt"
+          bash scripts/check_file_integrity.sh \
+            --generate \
+            --dir "$TMPDIR_SMOKE" \
+            --output "$TMPDIR_SMOKE/checksums.sha256"
+          bash scripts/check_file_integrity.sh \
+            --verify \
+            --dir "$TMPDIR_SMOKE" \
+            --input "$TMPDIR_SMOKE/checksums.sha256"
+          rm -rf "$TMPDIR_SMOKE"
