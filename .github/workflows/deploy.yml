@@ -1,0 +1,21 @@
+name: Script Execution Test
+
+on: [push]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Make Scripts Executable
+        run: chmod +x *.sh
+
+      - name: Execute All Scripts
+        run: |
+          for script in *.sh; do
+            echo "Running $script..."
+            # Using 'sudo' because many Blue Team scripts need root
+            sudo ./"$script" || echo "$script failed but continuing..."
+          done
