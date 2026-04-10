@@ -199,9 +199,9 @@ Solid, reliable, does the job. Superseded by v2, which has more airbags.
 Kept for lightweight/reference use. See v2 for the full breakdown.
 
 -----
-```bash
+
 ### 🚨 `pcdc_port_monitor_v2.sh`
-```
+
 **The paranoid edition. Because trusting userspace tools is adorably naïve.**
 
 Here’s an uncomfortable truth: if the red team has root, they can replace `ss` and `netstat` with versions that just… don’t show their connections.
