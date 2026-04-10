@@ -188,21 +188,20 @@ Alerts on changes. Auto-restarts scored services. Press `r` for instant incident
 
 ```bash
 sudo bash pcdc_linux_monitor.sh 45    # check every 45 seconds
-# Press 'r' + Enter at any time → instant incident report ```
+# Press 'r' + Enter at any time → instant incident report
+```
 
 -----
-
 ### 🔌 `pcdc_port_monitor.sh`
-
 **Port traffic monitor — v1. The original. The loyal family sedan.**
 
 Solid, reliable, does the job. Superseded by v2, which has more airbags.
 Kept for lightweight/reference use. See v2 for the full breakdown.
 
 -----
-
+```bash
 ### 🚨 `pcdc_port_monitor_v2.sh`
-
+```
 **The paranoid edition. Because trusting userspace tools is adorably naïve.**
 
 Here’s an uncomfortable truth: if the red team has root, they can replace `ss` and `netstat` with versions that just… don’t show their connections.
@@ -232,7 +231,8 @@ v2 bypasses `ss` entirely and reads `/proc/net/tcp` — kernel memory — where 
 sudo bash pcdc_port_monitor_v2.sh 30          # standard mode
 sudo bash pcdc_port_monitor_v2.sh --paranoid  # ☢️ 5s intervals, max verbosity
                                               # deploy when attacks begin
-                                              # caffeine recommended ```
+                                              # caffeine recommended
+```
 
 > **Before running:** Edit the `KNOWN_PORTS` table at the top.
 > Skipping this is like setting a burglar alarm without telling it where the doors are.
