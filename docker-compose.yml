@@ -1,0 +1,83 @@
+# ============================================================
+#  PCDC 2026 - ASTRA 9 BLUE TEAM
+#  Docker Compose — Admin Container
+#
+#  Usage:
+#    docker compose up -d    ← start detached
+#    docker compose exec blueteam bash  ← attach shell
+#    docker compose down     ← stop and remove container
+#
+#  Or just: docker compose run --rm blueteam
+# ============================================================
+
+version: '3.8'
+
+services:
+  blueteam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: astra9-blueteam:latest
+    container_name: astra9_admin
+    hostname: astra9-admin
+
+    # ── Network: host mode so the container shares the
+    # admin machine's network stack directly.
+    # This is critical for:
+    #   - nmap scanning your subnet
+    #   - tcpdump on your interface
+    #   - SSH reaching target hosts
+    #   - /proc/net/tcp matching host network state
+    network_mode: host
+
+    # ── Interactive TTY for the terminal dashboard ────────────
+    stdin_open: true
+    tty: true
+
+    # ── Volumes: persistent data survives container restarts ──
+    volumes:
+      # SSH keys — generated once, persist forever
+      - blueteam-keys:/opt/blueTeam/keys
+
+      # All logs and reports
+      - blueteam-logs:/opt/blueTeam/logs
+      - blueteam-reports:/opt/blueTeam/reports
+
+      # Hosts file — your fleet inventory
+      - blueteam-config:/opt/blueTeam/config
+
+      # Optional: mount host's .ssh for existing keys
+      # Uncomment if you want to use existing host SSH keys:
+      # - ~/.ssh:/root/.host-ssh:ro
+
+    # ── Environment ───────────────────────────────────────────
+    environment:
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+      - TZ=America/New_York
+
+    # ── Capabilities: needed for some network operations ──────
+    # NET_ADMIN: needed for tcpdump, raw sockets
+    # SYS_PTRACE: needed for some diagnostic tools
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_PTRACE
+
+    # ── Security options ──────────────────────────────────────
+    security_opt:
+      - no-new-privileges:false   # Allow sudo inside container
+
+    # ── Restart policy ────────────────────────────────────────
+    restart: unless-stopped
+
+# ── Named volumes ─────────────────────────────────────────────
+volumes:
+  blueteam-keys:
+    name: blueteam-keys
+  blueteam-logs:
+    name: blueteam-logs
+  blueteam-reports:
+    name: blueteam-reports
+  blueteam-config:
+    name: blueteam-config

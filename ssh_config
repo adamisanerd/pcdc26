@@ -1,0 +1,28 @@
+# ── PCDC 2026 Blue Team Container SSH Config ─────────────────
+# Global defaults for all competition hosts
+
+Host pcdc-*
+    IdentityFile /opt/blueTeam/keys/pcdc_admin
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+    ConnectTimeout 5
+    ServerAliveInterval 10
+    ServerAliveCountMax 3
+    Compression yes
+    ControlMaster auto
+    ControlPath /tmp/.ssh-ctrl-%r@%h:%p
+    ControlPersist 10m
+
+# Catch-all for any host — apply key and timeout defaults
+Host *
+    IdentityFile /opt/blueTeam/keys/pcdc_admin
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+    ConnectTimeout 5
+    ServerAliveInterval 10
+    ServerAliveCountMax 3
+    ControlMaster auto
+    ControlPath /tmp/.ssh-ctrl-%r@%h:%p
+    ControlPersist 10m
