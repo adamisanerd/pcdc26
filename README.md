@@ -14,6 +14,8 @@
 
 > *The Schwartz must flow. The drills must spin. The Red Team must not get in.*
 
+➡️ **New here? Start with the quick guide:** [QUICKSTART.md](QUICKSTART.md)
+
 ---
 
 ## ⚠️ Important Notice
@@ -114,8 +116,8 @@ docker --version    # verify
 ### Build the Image — Do This at Home
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
-cd astra9-blue-team
+git clone https://github.com/adamisanerd/pcdc26.git
+cd pcdc26
 
 # Builds Ubuntu 22.04 + all tools — takes 2-3 min first time
 bash container_run.sh build
@@ -1112,8 +1114,8 @@ docker --version
 
 ```bash
 # Clone the repo onto your admin machine
-git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
-cd astra9-blue-team
+git clone https://github.com/adamisanerd/pcdc26.git
+cd pcdc26
 
 # Build — downloads Ubuntu 22.04 and installs all tools
 # Takes 2-3 minutes on first build, much faster after (layer cache)
@@ -1204,8 +1206,8 @@ on your Ubuntu machine instead.
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
-cd astra9-blue-team
+git clone https://github.com/adamisanerd/pcdc26.git
+cd pcdc26
 chmod +x *.sh
 
 # Run the admin setup — installs all dependencies, generates SSH key,
@@ -1276,7 +1278,7 @@ On each **target machine**, open two terminals via `bt_ssh`:
 
 ```
 T-NIGHT  Night before competition — do this at home:
-         └─ git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
+         └─ git clone https://github.com/adamisanerd/pcdc26.git
             bash container_run.sh build
             docker save astra9-blueteam:latest | gzip > astra9-blueteam.tar.gz
             Change recovery account username in pcdc_recovery_access.sh
