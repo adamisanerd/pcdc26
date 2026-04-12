@@ -64,12 +64,12 @@ while read target; do
 
     # Test 1: Key auth as root
     root_key="FAIL"
-    root_result=$(ssh $SSH_OPTS root@"$host" "echo KEYOK" 2>/dev/null)
+    root_result=$(ssh -n $SSH_OPTS root@"$host" "echo KEYOK" 2>/dev/null)
     echo "$root_result" | grep -q "KEYOK" && root_key="${GRN}OK${NC}" || root_key="${RED}FAIL${NC}"
 
     # Test 2: Key auth as recovery user
     recov_key="FAIL"
-    recov_result=$(ssh $SSH_OPTS ${RECOVERY_USER}@"$host" "echo KEYOK" 2>/dev/null)
+    recov_result=$(ssh -n $SSH_OPTS ${RECOVERY_USER}@"$host" "echo KEYOK" 2>/dev/null)
     echo "$recov_result" | grep -q "KEYOK" && recov_key="${GRN}OK${NC}" || recov_key="${RED}FAIL${NC}"
 
     # Test 3: Recovery user still exists
@@ -79,7 +79,7 @@ while read target; do
         recov_exists="${GRN}EXISTS${NC}"
     else
         # Try to check via root key
-        user_check=$(ssh $SSH_OPTS root@"$host" "id $RECOVERY_USER 2>/dev/null" 2>/dev/null)
+        user_check=$(ssh -n $SSH_OPTS root@"$host" "id $RECOVERY_USER 2>/dev/null" 2>/dev/null)
         if echo "$user_check" | grep -q "$RECOVERY_USER"; then
             recov_exists="${YLW}EXISTS${NC}"  # exists but key broken
         else

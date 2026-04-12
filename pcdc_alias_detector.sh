@@ -285,7 +285,8 @@ fi
 
 echo ""
 info "Checking LD_PRELOAD in all running process environments:"
-for pid in $(ls /proc | grep '^[0-9]' | head -100); do
+for pid_dir in /proc/[0-9]*/; do
+    pid="${pid_dir%/}"; pid="${pid##*/}"
     if [ -r "/proc/$pid/environ" ]; then
         ld=$(cat "/proc/$pid/environ" 2>/dev/null | tr '\0' '\n' | grep "^LD_PRELOAD")
         if [ -n "$ld" ]; then
@@ -357,7 +358,8 @@ section "SECTION 6: ENVIRONMENT VARIABLE AUDIT"
 SUSPICIOUS_VARS=("LD_PRELOAD" "LD_LIBRARY_PATH" "PROMPT_COMMAND" "BASH_ENV" "ENV" "ZDOTDIR")
 
 info "Scanning all process environments for dangerous variables..."
-for pid in $(ls /proc | grep '^[0-9]'); do
+for pid_dir in /proc/[0-9]*/; do
+    pid="${pid_dir%/}"; pid="${pid##*/}"
     env_file="/proc/$pid/environ"
     if [ ! -r "$env_file" ]; then continue; fi
 

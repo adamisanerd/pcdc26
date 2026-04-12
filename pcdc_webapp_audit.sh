@@ -352,9 +352,8 @@ if command -v postfix &>/dev/null || ss -tlnp 2>/dev/null | grep -q ":25 \|:587"
     info "Mail server detected. Checking for open relay..."
 
     # Check Postfix config
-    for cfg in /etc/postfix/main.cf; do
-        [ ! -f "$cfg" ] && continue
-
+    cfg=/etc/postfix/main.cf
+    if [ -f "$cfg" ]; then
         info "Postfix main.cf key settings:"
         grep -E "^mynetworks|^relay_domains|^smtpd_recipient_restrictions|^inet_interfaces" "$cfg" 2>/dev/null
 
@@ -369,7 +368,7 @@ if command -v postfix &>/dev/null || ss -tlnp 2>/dev/null | grep -q ":25 \|:587"
         if echo "$inet" | grep -q "^inet_interfaces = all"; then
             warn "Postfix listening on all interfaces: $inet"
         fi
-    done
+    fi
 
     # Check mail queue for suspicious volume
     if command -v mailq &>/dev/null; then

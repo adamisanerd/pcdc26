@@ -222,9 +222,12 @@ check_outbound_connections() {
 }
 
 check_deleted_but_running() {
-    ls -la /proc/*/exe 2>/dev/null | grep -i deleted | while read line; do
-        alert "DELETED BINARY STILL RUNNING (common malware): $line"
-        log_incident "RUNNING DELETED BINARY" "$line" ""
+    for exe_link in /proc/*/exe; do
+        target=$(readlink "$exe_link" 2>/dev/null)
+        if [[ "$target" == *"(deleted)"* ]]; then
+            alert "DELETED BINARY STILL RUNNING (common malware): $exe_link -> $target"
+            log_incident "RUNNING DELETED BINARY" "$exe_link -> $target" ""
+        fi
     done
 }
 

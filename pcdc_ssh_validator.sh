@@ -118,9 +118,6 @@ declare -a TARGET_HOSTS=()
 declare -a USERNAMES=()
 declare -a PASSWORDS=()
 
-# Results matrix: RESULTS[ip:user:pass] = "success|fail|error"
-declare -A RESULTS
-
 # Working credentials per host: WORKING[ip] = "user:pass"
 declare -A WORKING_CREDS
 

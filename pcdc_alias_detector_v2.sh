@@ -313,7 +313,8 @@ EXPECTED_LIB_DIRS=("/lib" "/usr/lib" "/lib/x86_64-linux-gnu" "/usr/lib/x86_64-li
 
 info "Scanning all process memory maps for unexpected shared libraries..."
 
-for pid in $(ls /proc | grep '^[0-9]' | head -200); do
+for pid_dir in /proc/[0-9]*/; do
+    pid="${pid_dir%/}"; pid="${pid##*/}"
     maps_file="/proc/$pid/maps"
     [ ! -r "$maps_file" ] && continue
 

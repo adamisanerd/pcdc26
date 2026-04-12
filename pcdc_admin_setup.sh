@@ -40,7 +40,6 @@ NC='\033[0m'
 LOGDIR="$HOME/blueTeam/logs"
 KEYDIR="$HOME/blueTeam/keys"
 HOSTFILE="$HOME/blueTeam/hosts.txt"
-CREDFILE="$HOME/blueTeam/.creds"          # in-memory only, not written to disk by default
 SCRIPTDIR="$HOME/blueTeam/scripts"
 PROFILEFILE="$HOME/.blueTeam_profile"
 

@@ -531,7 +531,8 @@ check_reverse_shell_indicators() {
     section "REVERSE SHELL DETECTION"
     info "Checking for processes with socket FDs on stdin/stdout/stderr..."
 
-    for pid in $(ls /proc | grep '^[0-9]'); do
+    for pid_dir in /proc/[0-9]*/; do
+        pid="${pid_dir%/}"; pid="${pid##*/}"
         [ ! -d "/proc/$pid/fd" ] && continue
 
         comm=$(cat "/proc/$pid/comm" 2>/dev/null)
@@ -558,7 +559,7 @@ check_reverse_shell_indicators() {
 
         # Also flag shells with any socket at all (weaker signal but worth noting)
         if echo "$comm" | grep -qE '^(bash|sh|dash|zsh|ksh)$'; then
-            socket_fds=$(ls -la "/proc/$pid/fd/" 2>/dev/null | grep "socket:" | wc -l)
+            socket_fds=$(find "/proc/$pid/fd/" -maxdepth 1 -type l 2>/dev/null -exec readlink {} \; | grep -c "socket:" || true)
             if [ "$socket_fds" -gt 0 ]; then
                 warn "Shell PID $pid ($comm) has $socket_fds open socket(s)"
                 cmdline=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\0' ' ')

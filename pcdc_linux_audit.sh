@@ -169,8 +169,9 @@ ps aux | awk '$1 == "root" {print $1, $2, $11, $12}' | grep -v -E 'ps|awk|grep|s
 echo ""
 info "Processes with no associated binary path (common malware indicator):"
 ps aux | awk '$11 ~ /^\[/ {print "Kernel thread:", $0}' 
-ls -la /proc/*/exe 2>/dev/null | grep deleted | while read line; do
-    bad "Deleted binary still running: $line"
+for exe_link in /proc/*/exe; do
+    target=$(readlink "$exe_link" 2>/dev/null)
+    [[ "$target" == *"(deleted)"* ]] && bad "Deleted binary still running: $exe_link -> $target"
 done
 
 # ============================================================
