@@ -40,7 +40,7 @@ fi
 case "$MODE" in
     generate)
         echo "=== Generating checksums for: $DIR ==="
-        find "$DIR" -type f -print0 \
+        find "$DIR" -type f -not -path "$CHECKSUM_FILE" -print0 \
             | sort -z \
             | xargs -0 sha256sum > "$CHECKSUM_FILE"
         echo "Checksums written to: $CHECKSUM_FILE"
