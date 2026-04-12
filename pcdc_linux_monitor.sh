@@ -35,7 +35,8 @@ log_incident() {
     local type=$1
     local detail=$2
     local src_ip=$3
-    local dst_ip=$(hostname -I | awk '{print $1}')
+    local dst_ip
+    dst_ip=$(hostname -I | awk '{print $1}')
     cat >> "$INCIDENT_LOG" << EOF
 
 ============================================================
@@ -135,7 +136,6 @@ check_new_processes() {
 }
 
 check_cron_changes() {
-    local current_crons
     for user in $(cut -f1 -d: /etc/passwd); do
         crontab -u "$user" -l 2>/dev/null
     done | sort > "$STATE_DIR/crons.current"
@@ -222,9 +222,12 @@ check_outbound_connections() {
 }
 
 check_deleted_but_running() {
-    ls -la /proc/*/exe 2>/dev/null | grep -i deleted | while read line; do
-        alert "DELETED BINARY STILL RUNNING (common malware): $line"
-        log_incident "RUNNING DELETED BINARY" "$line" ""
+    for exe_link in /proc/*/exe; do
+        target=$(readlink "$exe_link" 2>/dev/null)
+        if [[ "$target" == *"(deleted)"* ]]; then
+            alert "DELETED BINARY STILL RUNNING (common malware): $exe_link -> $target"
+            log_incident "RUNNING DELETED BINARY" "$exe_link -> $target" ""
+        fi
     done
 }
 
@@ -263,7 +266,8 @@ check_services() {
 # INCIDENT REPORT GENERATOR
 # ============================================================
 generate_incident_report() {
-    local outfile="$LOGDIR/incident_report_$(date +%Y%m%d_%H%M%S).txt"
+    local outfile
+    outfile="$LOGDIR/incident_report_$(date +%Y%m%d_%H%M%S).txt"
     cat > "$outfile" << EOF
 ============================================================
 PCDC 2026 | ASTRA 9 BLUE TEAM

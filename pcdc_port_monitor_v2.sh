@@ -123,8 +123,6 @@ declare -A BINARY_HASHES
 
 # Thresholds
 CONN_THRESHOLD=20
-RATE_THRESHOLD=50
-FOREIGN_THRESHOLD=10
 BYTE_RATIO_THRESHOLD=10   # outbound/inbound byte ratio — high = possible exfil
 
 # ============================================================
@@ -196,7 +194,7 @@ proc_net_listeners() {
         local file=$1
         local proto=$2
         # State 0A = LISTEN, 01 = ESTABLISHED
-        awk 'NR>1 {
+        awk -v proto="$proto" 'NR>1 {
             split($2, local, ":");
             split($3, remote, ":");
             state=$4;
@@ -271,7 +269,7 @@ check_ipv6_listeners() {
     done
 
     # Specifically flag IPv6 listeners on non-standard ports
-    ss -tulnp 2>/dev/null | grep -E "\[|::" | while read proto rq sq local foreign state proc; do
+    ss -tulnp 2>/dev/null | grep -E "\[|::" | while read -r _proto _rq _sq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         binary=$(echo "$proc" | grep -oP '"[^"]*"' | head -1 | tr -d '"')
         if [ -z "${KNOWN_PORTS[$port]}" ]; then
@@ -465,7 +463,7 @@ check_port_owner_deep() {
     section "DEEP PORT OWNER VERIFICATION"
     info "Verifying port owners via /proc/PID/exe (bypasses binary renaming)..."
 
-    ss -tulnp 2>/dev/null | tail -n +2 | while read proto rq sq local foreign state proc; do
+    ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _rq _sq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         binary=$(echo "$proc" | grep -oP '"[^"]*"' | head -1 | tr -d '"')
         pid=$(echo "$proc" | grep -oP 'pid=\K[0-9]+' | head -1)
@@ -531,7 +529,8 @@ check_reverse_shell_indicators() {
     section "REVERSE SHELL DETECTION"
     info "Checking for processes with socket FDs on stdin/stdout/stderr..."
 
-    for pid in $(ls /proc | grep '^[0-9]'); do
+    for pid_dir in /proc/[0-9]*/; do
+        pid="${pid_dir%/}"; pid="${pid##*/}"
         [ ! -d "/proc/$pid/fd" ] && continue
 
         comm=$(cat "/proc/$pid/comm" 2>/dev/null)
@@ -558,7 +557,7 @@ check_reverse_shell_indicators() {
 
         # Also flag shells with any socket at all (weaker signal but worth noting)
         if echo "$comm" | grep -qE '^(bash|sh|dash|zsh|ksh)$'; then
-            socket_fds=$(ls -la "/proc/$pid/fd/" 2>/dev/null | grep "socket:" | wc -l)
+            socket_fds=$(find "/proc/$pid/fd/" -maxdepth 1 -type l -exec readlink {} \; 2>/dev/null | grep -c "socket:" || true)
             if [ "$socket_fds" -gt 0 ]; then
                 warn "Shell PID $pid ($comm) has $socket_fds open socket(s)"
                 cmdline=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\0' ' ')
@@ -572,7 +571,7 @@ check_reverse_shell_indicators() {
 # NEW LISTENERS + OLD v1 CHECKS (kept and improved)
 # ============================================================
 check_new_listeners() {
-    ss -tulnp 2>/dev/null | tail -n +2 | while read proto rq sq local foreign state proc; do
+    ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _rq _sq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         echo "$port $proc"
     done | sort -n > "$STATE_DIR/listeners.current"
@@ -605,8 +604,9 @@ check_connection_volume() {
 # ============================================================
 jitter_sleep() {
     local base=$1
-    local jitter=$(( RANDOM % (base / 2) ))
-    local actual=$(( base - (base/4) + jitter ))
+    local jitter actual
+    jitter=$(( RANDOM % (base / 2) ))
+    actual=$(( base - (base/4) + jitter ))
     info "Next check in ${actual}s..."
     sleep "$actual"
 }
@@ -632,7 +632,7 @@ echo ""
 hash_known_binaries
 
 # Initial baseline
-ss -tulnp 2>/dev/null | tail -n +2 | while read proto rq sq local foreign state proc; do
+ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _rq _sq local _foreign _state proc; do
     port=$(echo "$local" | rev | cut -d: -f1 | rev)
     echo "$port $proc"
 done | sort -n > "$STATE_DIR/listeners.baseline"

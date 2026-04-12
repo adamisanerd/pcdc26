@@ -238,7 +238,7 @@ CRITICAL_FILES=(
 
 for entry in "${CRITICAL_FILES[@]}"; do
     filepath=$(echo "$entry" | cut -d: -f1)
-    expected_perm=$(echo "$entry" | cut -d: -f2)
+    _expected_perm=$(echo "$entry" | cut -d: -f2)
 
     [ ! -f "$filepath" ] && continue
 

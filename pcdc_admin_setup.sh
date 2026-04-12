@@ -34,13 +34,11 @@ GRN='\033[0;32m'
 YLW='\033[1;33m'
 BLU='\033[0;34m'
 CYN='\033[0;36m'
-MAG='\033[0;35m'
 NC='\033[0m'
 
 LOGDIR="$HOME/blueTeam/logs"
 KEYDIR="$HOME/blueTeam/keys"
 HOSTFILE="$HOME/blueTeam/hosts.txt"
-CREDFILE="$HOME/blueTeam/.creds"          # in-memory only, not written to disk by default
 SCRIPTDIR="$HOME/blueTeam/scripts"
 PROFILEFILE="$HOME/.blueTeam_profile"
 
@@ -213,7 +211,8 @@ BLU='\033[0;34m'; CYN='\033[0;36m'; NC='\033[0m'
 bt_ssh() {
     local target=$1
     local pass=$2
-    local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    local TIMESTAMP
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
     if [ -n "$pass" ]; then
         sshpass -p "$pass" ssh \
@@ -252,8 +251,9 @@ bt_run_covert() {
     local script=$1
     local target=$2
     local pass=$3
-    local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    local host_clean=$(echo "$target" | tr '@.' '_')
+    local TIMESTAMP host_clean
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    host_clean=$(echo "$target" | tr '@.' '_')
     local log="$BLUETEAM_LOGS/covert_${host_clean}_$(basename $script)_${TIMESTAMP}.log"
 
     if [ ! -f "$script" ]; then
@@ -340,7 +340,8 @@ bt_cmd() {
 bt_run_all() {
     local script=$1
     local pass=$2
-    local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    local TIMESTAMP
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     local pids=()
     local hosts=()
 

@@ -143,7 +143,7 @@ case "${1:-run}" in
 
     # ── Export logs from container volume ─────────────────────
     export-logs)
-        local dest="${2:-./blueteam-logs-export}"
+        dest="${2:-./blueteam-logs-export}"
         mkdir -p "$dest"
         info "Exporting logs to $dest..."
         docker run --rm \

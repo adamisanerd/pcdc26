@@ -169,7 +169,7 @@ else
     # Manual ping sweep fallback
     SUBNET_BASE=$(echo "$TARGET_SUBNET" | cut -d'/' -f1 | cut -d'.' -f1-3)
     info "Manual ping sweep of $SUBNET_BASE.0/24..."
-    > "$STATE_DIR/live_ips_$TIMESTAMP.txt"
+    : > "$STATE_DIR/live_ips_$TIMESTAMP.txt"
     for i in $(seq 1 254); do
         ip="$SUBNET_BASE.$i"
         if ping -c 1 -W 1 "$ip" &>/dev/null 2>&1; then
@@ -261,7 +261,7 @@ echo ""
 info "Scanning ${#YOUR_HOSTS[@]} hosts in detail..."
 
 FULL_SCAN_FILE="$STATE_DIR/full_scan_$TIMESTAMP.txt"
-> "$FULL_SCAN_FILE"
+: > "$FULL_SCAN_FILE"
 
 for target_ip in "${YOUR_HOSTS[@]}"; do
     echo ""
@@ -323,7 +323,7 @@ for scan_file in "$STATE_DIR"/scan_*_"$TIMESTAMP".txt; do
         port=$(echo "$line" | awk '{print $1}' | cut -d'/' -f1)
         state=$(echo "$line" | awk '{print $2}')
         service=$(echo "$line" | awk '{print $3}')
-        version=$(echo "$line" | cut -d' ' -f4-)
+        _version=$(echo "$line" | cut -d' ' -f4-)
 
         [ "$state" != "open" ] && continue
 

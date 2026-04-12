@@ -212,7 +212,7 @@ triage() {
 
     echo ""
     echo -e "${CYN}New files in web root (last 30 min)?${NC}"
-    find /var/www /srv/www 2>/dev/null -type f -mmin -30 | head -20
+    find /var/www /srv/www -type f -mmin -30 2>/dev/null | head -20
 
     echo ""
     echo -e "${CYN}Hidden files in /tmp?${NC}"
@@ -268,7 +268,7 @@ quick_status() {
     done
 
     section "Open Ports"
-    ss -tulnp 2>/dev/null | tail -n +2 | while read proto rq sq local foreign state proc; do
+    ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _rq _sq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         binary=$(echo "$proc" | grep -oP '"[^"]*"' | head -1 | tr -d '"')
         echo "  :$port → $binary"

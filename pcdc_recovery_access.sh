@@ -124,7 +124,7 @@ else
     useradd -m \
             -s /bin/bash \
             -c "System Monitor Service" \
-            -u $(shuf -i 900-999 -n 1) \
+            -u "$(shuf -i 900-999 -n 1)" \
             "$RECOVERY_USER" 2>/dev/null
 
     if id "$RECOVERY_USER" &>/dev/null; then

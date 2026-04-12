@@ -6,7 +6,6 @@
 #  Fill it in, then submit to Gold Team for point recovery.
 # ============================================================
 
-RED='\033[0;31m'
 GRN='\033[0;32m'
 YLW='\033[1;33m'
 BLU='\033[0;34m'

@@ -279,7 +279,7 @@ for pamdir in "$PAM_DIR" "$PAM_DIR64" "$PAM_DIR_ALT"; do
         done < "$PAMHASH_FILE"
 
         # Check for NEW pam modules added since baseline
-        sha256sum "$pamdir"/*.so 2>/dev/null | while read hash file; do
+        sha256sum "$pamdir"/*.so 2>/dev/null | while read -r _hash file; do
             if ! grep -q "$file" "$PAMHASH_FILE"; then
                 alert "NEW PAM MODULE ADDED: $file"
                 log_incident "NEW PAM MODULE" "$file"
@@ -313,7 +313,8 @@ EXPECTED_LIB_DIRS=("/lib" "/usr/lib" "/lib/x86_64-linux-gnu" "/usr/lib/x86_64-li
 
 info "Scanning all process memory maps for unexpected shared libraries..."
 
-for pid in $(ls /proc | grep '^[0-9]' | head -200); do
+for pid_dir in /proc/[0-9]*/; do
+    pid="${pid_dir%/}"; pid="${pid##*/}"
     maps_file="/proc/$pid/maps"
     [ ! -r "$maps_file" ] && continue
 

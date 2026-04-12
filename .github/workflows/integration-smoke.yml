@@ -1,0 +1,228 @@
+name: Integration Smoke (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      timeout_seconds:
+        description: "Per-script timeout in seconds"
+        required: false
+        default: "30"
+      run_windows_smoke:
+        description: "Run Windows runtime smoke for non-destructive .ps1 scripts"
+        required: false
+        default: "true"
+      include_ad_audit:
+        description: "Also smoke-run pcdc_win_ad_audit.ps1 (environment-dependent)"
+        required: false
+        default: "false"
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  linux-top-level-smoke:
+    name: Top-level Linux scripts smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ubuntu:22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install broad runtime dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            bash \
+            coreutils \
+            findutils \
+            grep \
+            sed \
+            gawk \
+            iproute2 \
+            net-tools \
+            procps \
+            cron \
+            openssh-client \
+            sshpass \
+            nmap \
+            tmux \
+            netcat-openbsd \
+            curl \
+            tcpdump \
+            tshark \
+            whois \
+            libcap2-bin \
+            util-linux \
+            systemd \
+            ca-certificates
+
+      - name: Prepare script permissions
+        run: |
+          chmod +x pcdc_*.sh scripts/*.sh tests/*.sh || true
+
+      - name: Smoke run top-level Linux scripts with timeout guards
+        shell: bash
+        run: |
+          set -u
+          TIMEOUT_SECONDS="${{ github.event.inputs.timeout_seconds || '30' }}"
+          mkdir -p .ci-logs
+
+          failed=0
+
+          # Only top-level Linux bash scripts (exclude helper folders)
+          mapfile -t SCRIPTS < <(find . -maxdepth 1 -type f -name 'pcdc_*.sh' | sort)
+
+          if [[ "${#SCRIPTS[@]}" -eq 0 ]]; then
+            echo "No top-level pcdc_*.sh scripts found."
+            exit 1
+          fi
+
+          echo "Running ${#SCRIPTS[@]} scripts with timeout=${TIMEOUT_SECONDS}s"
+
+          for script in "${SCRIPTS[@]}"; do
+            base="$(basename "$script")"
+            logfile=".ci-logs/${base}.log"
+
+            echo ""
+            echo "===== SMOKE: ${base} ====="
+
+            # Run with stdin closed to avoid hanging on prompts forever.
+            # timeout exit codes:
+            #   124 -> timed out (acceptable for interactive/looping scripts)
+            #   0/1 -> acceptable (normal completion / guarded exit)
+            set +e
+            timeout "${TIMEOUT_SECONDS}"s bash "$script" </dev/null >"$logfile" 2>&1
+            rc=$?
+            set -e
+
+            case "$rc" in
+              0)
+                echo "PASS: ${base} exited 0"
+                ;;
+              1)
+                echo "PASS: ${base} exited 1 (guarded/runtime-dependent path)"
+                ;;
+              124)
+                echo "PASS: ${base} timed out at ${TIMEOUT_SECONDS}s (expected for interactive/continuous scripts)"
+                ;;
+              *)
+                echo "FAIL: ${base} exited ${rc}"
+                failed=$((failed + 1))
+                ;;
+            esac
+
+            # Keep job logs readable, write full output to artifact
+            echo "--- tail: ${base} ---"
+            tail -n 20 "$logfile" || true
+          done
+
+          if [[ "$failed" -gt 0 ]]; then
+            echo ""
+            echo "Smoke integration failed on ${failed} script(s)."
+            exit 1
+          fi
+
+          echo ""
+          echo "All top-level Linux scripts passed smoke criteria."
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-smoke-logs
+          path: .ci-logs/
+          if-no-files-found: warn
+
+  windows-runtime-smoke:
+    name: Windows non-destructive runtime smoke
+    if: ${{ github.event.inputs.run_windows_smoke == 'true' }}
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Smoke run Windows scripts with timeout guards
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $TimeoutSeconds = [int]"${{ github.event.inputs.timeout_seconds || '30' }}"
+          $LogDir = Join-Path $PWD '.ci-logs-windows'
+          $OutDir = Join-Path $env:RUNNER_TEMP 'blueTeam'
+
+          New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+          $failed = 0
+
+          function Invoke-SmokeScript {
+            param(
+              [Parameter(Mandatory)] [string]$ScriptPath,
+              [string[]]$Arguments = @(),
+              [int[]]$AcceptableExitCodes = @(0, 1)
+            )
+
+            $base = Split-Path $ScriptPath -Leaf
+            $logFile = Join-Path $LogDir ("$base.log")
+
+            Write-Host ""
+            Write-Host "===== SMOKE: $base ====="
+
+            $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $Arguments
+            $proc = Start-Process -FilePath 'pwsh' -ArgumentList $argList -NoNewWindow -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $logFile
+
+            try {
+              Wait-Process -Id $proc.Id -Timeout $TimeoutSeconds -ErrorAction Stop
+            } catch {
+              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+              Write-Host "PASS: $base timed out at ${TimeoutSeconds}s (expected for interactive/continuous scripts)"
+              if (Test-Path $logFile) {
+                Write-Host "--- tail: $base ---"
+                Get-Content $logFile -Tail 20
+              }
+              return
+            }
+
+            $exitCode = $proc.ExitCode
+            if ($AcceptableExitCodes -contains $exitCode) {
+              Write-Host "PASS: $base exited $exitCode"
+            } else {
+              Write-Host "FAIL: $base exited $exitCode"
+              $script:failed++
+            }
+
+            if (Test-Path $logFile) {
+              Write-Host "--- tail: $base ---"
+              Get-Content $logFile -Tail 20
+            }
+          }
+
+          # Non-destructive scripts
+          Invoke-SmokeScript -ScriptPath '.\pcdc_win_audit.ps1' -Arguments @('-OutputPath', $OutDir)
+          Invoke-SmokeScript -ScriptPath '.\pcdc_win_monitor.ps1' -Arguments @('-Interval', '5', '-Services', 'Spooler', '-OutputPath', $OutDir)
+
+          # Optional: AD audit is read-only but environment-dependent on AD module/domain
+          if ('${{ github.event.inputs.include_ad_audit }}' -eq 'true') {
+            Invoke-SmokeScript -ScriptPath '.\pcdc_win_ad_audit.ps1' -Arguments @('-OutputPath', $OutDir) -AcceptableExitCodes @(0, 1)
+          }
+
+          if ($failed -gt 0) {
+            throw "Windows smoke integration failed on $failed script(s)."
+          }
+
+          Write-Host ""
+          Write-Host 'Windows runtime smoke passed.'
+
+      - name: Upload Windows smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-smoke-logs-windows
+          path: .ci-logs-windows/
+          if-no-files-found: warn

@@ -118,9 +118,6 @@ declare -a TARGET_HOSTS=()
 declare -a USERNAMES=()
 declare -a PASSWORDS=()
 
-# Results matrix: RESULTS[ip:user:pass] = "success|fail|error"
-declare -A RESULTS
-
 # Working credentials per host: WORKING[ip] = "user:pass"
 declare -A WORKING_CREDS
 
@@ -259,7 +256,8 @@ test_ssh_credential() {
 run_credential_sweep() {
     section "CREDENTIAL SWEEP"
 
-    local total_tests=$(( ${#TARGET_HOSTS[@]} * ${#USERNAMES[@]} ))
+    local total_tests
+    total_tests=$(( ${#TARGET_HOSTS[@]} * ${#USERNAMES[@]} ))
     local test_num=0
     local success_count=0
     local fail_count=0
