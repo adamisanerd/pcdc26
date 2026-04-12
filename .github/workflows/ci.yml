@@ -25,6 +25,7 @@ jobs:
           apt-get install -y --no-install-recommends shellcheck findutils
 
       - name: Lint every .sh file
+        shell: bash
         run: |
           mapfile -t SH_FILES < <(find . -type f -name "*.sh" | sort)
           if [ "${#SH_FILES[@]}" -eq 0 ]; then
@@ -35,6 +36,7 @@ jobs:
           shellcheck --severity=warning "${SH_FILES[@]}"
 
       - name: Syntax check every .sh file
+        shell: bash
         run: |
           mapfile -t SH_FILES < <(find . -type f -name "*.sh" | sort)
           for f in "${SH_FILES[@]}"; do
@@ -43,6 +45,7 @@ jobs:
           done
 
       - name: Ensure every .sh file is executable
+        shell: bash
         run: |
           mapfile -t SH_FILES < <(find . -type f -name "*.sh" | sort)
           not_exec=0
