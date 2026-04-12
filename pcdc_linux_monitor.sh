@@ -35,7 +35,8 @@ log_incident() {
     local type=$1
     local detail=$2
     local src_ip=$3
-    local dst_ip=$(hostname -I | awk '{print $1}')
+    local dst_ip
+    dst_ip=$(hostname -I | awk '{print $1}')
     cat >> "$INCIDENT_LOG" << EOF
 
 ============================================================

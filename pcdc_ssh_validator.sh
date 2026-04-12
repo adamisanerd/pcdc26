@@ -256,7 +256,8 @@ test_ssh_credential() {
 run_credential_sweep() {
     section "CREDENTIAL SWEEP"
 
-    local total_tests=$(( ${#TARGET_HOSTS[@]} * ${#USERNAMES[@]} ))
+    local total_tests
+    total_tests=$(( ${#TARGET_HOSTS[@]} * ${#USERNAMES[@]} ))
     local test_num=0
     local success_count=0
     local fail_count=0

@@ -58,7 +58,7 @@ echo "────────────────────────�
 while read target; do
     [[ "$target" == \#* ]] || [ -z "$target" ] && continue
 
-    user=$(echo "$target" | cut -d@ -f1)
+    _user=$(echo "$target" | cut -d@ -f1)
     host=$(echo "$target" | cut -d@ -f2)
     TOTAL=$((TOTAL + 1))
 

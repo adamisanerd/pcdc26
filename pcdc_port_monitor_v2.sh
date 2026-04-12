@@ -123,8 +123,6 @@ declare -A BINARY_HASHES
 
 # Thresholds
 CONN_THRESHOLD=20
-RATE_THRESHOLD=50
-FOREIGN_THRESHOLD=10
 BYTE_RATIO_THRESHOLD=10   # outbound/inbound byte ratio — high = possible exfil
 
 # ============================================================
@@ -559,7 +557,7 @@ check_reverse_shell_indicators() {
 
         # Also flag shells with any socket at all (weaker signal but worth noting)
         if echo "$comm" | grep -qE '^(bash|sh|dash|zsh|ksh)$'; then
-            socket_fds=$(find "/proc/$pid/fd/" -maxdepth 1 -type l 2>/dev/null -exec readlink {} \; | grep -c "socket:" || true)
+            socket_fds=$(find "/proc/$pid/fd/" -maxdepth 1 -type l -exec readlink {} \; 2>/dev/null | grep -c "socket:" || true)
             if [ "$socket_fds" -gt 0 ]; then
                 warn "Shell PID $pid ($comm) has $socket_fds open socket(s)"
                 cmdline=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\0' ' ')
@@ -606,8 +604,9 @@ check_connection_volume() {
 # ============================================================
 jitter_sleep() {
     local base=$1
-    local jitter=$(( RANDOM % (base / 2) ))
-    local actual=$(( base - (base/4) + jitter ))
+    local jitter actual
+    jitter=$(( RANDOM % (base / 2) ))
+    actual=$(( base - (base/4) + jitter ))
     info "Next check in ${actual}s..."
     sleep "$actual"
 }
@@ -633,7 +632,7 @@ echo ""
 hash_known_binaries
 
 # Initial baseline
-ss -tulnp 2>/dev/null | tail -n +2 | while read proto rq sq local foreign state proc; do
+ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _rq _sq local _foreign _state proc; do
     port=$(echo "$local" | rev | cut -d: -f1 | rev)
     echo "$port $proc"
 done | sort -n > "$STATE_DIR/listeners.baseline"

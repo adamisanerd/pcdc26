@@ -151,7 +151,7 @@ check_port_binary_mismatch() {
     section "PORT → BINARY MISMATCH CHECK"
     info "Verifying that each known port is owned by the expected binary..."
 
-    ss -tulnp 2>/dev/null | tail -n +2 | while read proto recvq sendq local foreign state proc; do
+    ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _recvq _sendq local foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         # Extract binary name from proc field (format: users:(("sshd",pid=1234,...)))
         binary=$(echo "$proc" | grep -oP '"[^"]*"' | head -1 | tr -d '"')
@@ -302,7 +302,7 @@ check_connection_owners() {
 
     SUSPICIOUS_PROCS=("bash" "sh" "dash" "zsh" "python" "python3" "perl" "ruby" "nc" "ncat" "netcat" "socat" "curl" "wget")
 
-    ss -tnp state established 2>/dev/null | tail -n +2 | while read state recvq sendq local foreign proc; do
+    ss -tnp state established 2>/dev/null | tail -n +2 | while read -r _state _recvq _sendq local foreign proc; do
         binary=$(echo "$proc" | grep -oP '"[^"]*"' | head -1 | tr -d '"')
         pid=$(echo "$proc" | grep -oP 'pid=\K[0-9]+' | head -1)
         foreign_ip=$(echo "$foreign" | rev | cut -d: -f2- | rev)
