@@ -1,21 +1,13 @@
-name: Script Execution Test
+name: Legacy Script Execution Test (manual)
 
-on: [push]
+on:
+  workflow_dispatch:
 
 jobs:
-  smoke-test:
+  archived:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Make Scripts Executable
-        run: chmod +x *.sh
-
-      - name: Execute All Scripts
+      - name: Legacy workflow notice
         run: |
-          for script in *.sh; do
-            echo "Running $script..."
-            # Using 'sudo' because many Blue Team scripts need root
-            sudo ./"$script" || echo "$script failed but continuing..."
-          done
+          echo "This legacy workflow is archived."
+          echo "Use .github/workflows/ci.yml for active CI/CD validation."

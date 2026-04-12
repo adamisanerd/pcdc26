@@ -1,4 +1,4 @@
-name: Blue Team Script CI
+name: Blue Team CI Pipeline
 
 on:
   push:
@@ -7,11 +7,8 @@ on:
     branches: ["**"]
 
 jobs:
-  # ──────────────────────────────────────────────────────────────
-  # Job 1: Lint all shell scripts with ShellCheck
-  # ──────────────────────────────────────────────────────────────
-  shellcheck:
-    name: ShellCheck Lint
+  shell-lint-and-syntax:
+    name: Shell scripts (lint + syntax + executable)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -25,25 +22,77 @@ jobs:
       - name: Install ShellCheck
         run: |
           apt-get update -qq
-          apt-get install -y --no-install-recommends shellcheck
+          apt-get install -y --no-install-recommends shellcheck findutils
 
-      - name: Lint scripts/
+      - name: Lint every .sh file
         run: |
-          echo "=== Linting scripts/ ==="
-          shellcheck --severity=warning scripts/*.sh
+          mapfile -t SH_FILES < <(find . -type f -name "*.sh" | sort)
+          if [ "${#SH_FILES[@]}" -eq 0 ]; then
+            echo "No shell scripts found."
+            exit 1
+          fi
+          printf 'Linting %s shell scripts\n' "${#SH_FILES[@]}"
+          shellcheck --severity=warning "${SH_FILES[@]}"
 
-      - name: Lint tests/
+      - name: Syntax check every .sh file
         run: |
-          echo "=== Linting tests/ ==="
-          shellcheck --severity=warning tests/*.sh
+          mapfile -t SH_FILES < <(find . -type f -name "*.sh" | sort)
+          for f in "${SH_FILES[@]}"; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
 
-  # ──────────────────────────────────────────────────────────────
-  # Job 2: Run the test suite inside a Linux container
-  # ──────────────────────────────────────────────────────────────
-  test:
-    name: Run Tests
+      - name: Ensure every .sh file is executable
+        run: |
+          mapfile -t SH_FILES < <(find . -type f -name "*.sh" | sort)
+          not_exec=0
+          for f in "${SH_FILES[@]}"; do
+            if [ ! -x "$f" ]; then
+              echo "NOT EXECUTABLE: $f"
+              not_exec=1
+            fi
+          done
+          if [ "$not_exec" -ne 0 ]; then
+            echo "One or more shell scripts are not executable."
+            exit 1
+          fi
+
+  powershell-parse:
+    name: PowerShell scripts (parse)
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse every .ps1 file
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = Get-ChildItem -Path . -Filter *.ps1 -Recurse | Sort-Object FullName
+          if (-not $files) {
+            throw 'No PowerShell scripts found.'
+          }
+
+          foreach ($file in $files) {
+            Write-Host "Parsing $($file.FullName)"
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors -and $errors.Count -gt 0) {
+              $errors | ForEach-Object {
+                Write-Host "ERROR in $($file.FullName): $($_.Message)" -ForegroundColor Red
+              }
+              throw "PowerShell parse errors found in $($file.FullName)"
+            }
+          }
+
+  tests:
+    name: Utility tests (bash)
     runs-on: ubuntu-latest
-    needs: shellcheck
+    needs: shell-lint-and-syntax
     permissions:
       contents: read
     container:
@@ -61,31 +110,21 @@ jobs:
             procps \
             cron
 
-      - name: Make all scripts executable
+      - name: Make utility scripts executable
         run: chmod +x scripts/*.sh tests/*.sh
 
-      - name: Test – check_open_ports
-        run: bash tests/test_check_open_ports.sh
+      - name: Run test suite
+        run: |
+          bash tests/test_check_open_ports.sh
+          bash tests/test_check_failed_logins.sh
+          bash tests/test_check_file_integrity.sh
+          bash tests/test_check_processes.sh
+          bash tests/test_check_crontabs.sh
 
-      - name: Test – check_failed_logins
-        run: bash tests/test_check_failed_logins.sh
-
-      - name: Test – check_file_integrity
-        run: bash tests/test_check_file_integrity.sh
-
-      - name: Test – check_processes
-        run: bash tests/test_check_processes.sh
-
-      - name: Test – check_crontabs
-        run: bash tests/test_check_crontabs.sh
-
-  # ──────────────────────────────────────────────────────────────
-  # Job 3: Smoke-run every script to confirm zero-error execution
-  # ──────────────────────────────────────────────────────────────
-  smoke:
-    name: Smoke Run Scripts
+  utility-smoke:
+    name: Utility smoke tests
     runs-on: ubuntu-latest
-    needs: shellcheck
+    needs: shell-lint-and-syntax
     permissions:
       contents: read
     container:
@@ -103,19 +142,19 @@ jobs:
             procps \
             cron
 
-      - name: Make scripts executable
+      - name: Make utility scripts executable
         run: chmod +x scripts/*.sh
 
-      - name: Smoke – check_open_ports (no args)
+      - name: Smoke check_open_ports
         run: bash scripts/check_open_ports.sh
 
-      - name: Smoke – check_processes (no args)
+      - name: Smoke check_processes
         run: bash scripts/check_processes.sh
 
-      - name: Smoke – check_crontabs
+      - name: Smoke check_crontabs
         run: bash scripts/check_crontabs.sh
 
-      - name: Smoke – check_file_integrity (generate + verify)
+      - name: Smoke check_file_integrity (generate + verify)
         run: |
           TMPDIR_SMOKE="$(mktemp -d)"
           echo "sample" > "$TMPDIR_SMOKE/file.txt"
