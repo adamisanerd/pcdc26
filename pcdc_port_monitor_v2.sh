@@ -194,7 +194,7 @@ proc_net_listeners() {
         local file=$1
         local proto=$2
         # State 0A = LISTEN, 01 = ESTABLISHED
-        awk 'NR>1 {
+        awk -v proto="$proto" 'NR>1 {
             split($2, local, ":");
             split($3, remote, ":");
             state=$4;
