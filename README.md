@@ -91,6 +91,121 @@ Buckle up:
 
 ---
 
+## 🐳 Container Quick-Start
+*(Get Operational in Two Minutes)*
+
+The entire toolkit ships as a Docker container. Every dependency is pre-installed.
+No `apt install`, no version conflicts, no "it worked at home" surprises.
+Pull it, build it, run it — you're done.
+
+> *Think of it as your go-bag. Pre-packed, ready to deploy, everything included.*
+> *Like a hacking lair in a box. A very defensive, very legal hacking lair.*
+
+### Prerequisites — Install Docker Once
+
+```bash
+# On your Ubuntu admin machine
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+newgrp docker
+docker --version    # verify
+```
+
+### Build the Image — Do This at Home
+
+```bash
+git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
+cd astra9-blue-team
+
+# Builds Ubuntu 22.04 + all tools — takes 2-3 min first time
+bash container_run.sh build
+```
+
+> ⚠️ **Build at home, not on competition day.**
+> Save the image so you don't depend on competition internet at all:
+
+```bash
+# Save to file (~500MB compressed)
+docker save astra9-blueteam:latest | gzip > astra9-blueteam.tar.gz
+
+# Load on competition day — no internet needed, takes ~30 seconds
+docker load < astra9-blueteam.tar.gz
+```
+
+### Run It
+
+```bash
+# Drop straight into the Blue Team shell
+bash container_run.sh run
+
+# Inside the container — you're immediately operational:
+bt_help                              # all available commands
+bt_add_host root@10.0.1.10 "web"   # add machines from your Blue Team Packet
+bt_push_key_all "packetpassword"    # deploy SSH keys to all hosts
+bt_run_all pcdc_linux_audit.sh      # audit every host simultaneously
+bt_dashboard                         # live log stream from all hosts
+bt_status_all                        # fleet health check
+```
+
+### All Container Management Commands
+
+```bash
+bash container_run.sh build         # Build image from scratch
+bash container_run.sh run           # Run interactively ← use this most
+bash container_run.sh start         # Start in background
+bash container_run.sh attach        # Attach to running background container
+bash container_run.sh status        # Image / container / volume status
+bash container_run.sh logs          # View container output
+bash container_run.sh export-logs   # Copy logs out to host filesystem
+bash container_run.sh rebuild       # Full rebuild without cache
+bash container_run.sh clean         # Remove container + image (keeps data volumes)
+```
+
+### Container Files in This Repo
+
+| File | Purpose |
+|---|---|
+| `Dockerfile` | Defines the image — Ubuntu 22.04 + all tools + all scripts |
+| `docker-compose.yml` | Alternative to `container_run.sh` — `docker compose up` |
+| `container_run.sh` | Helper script wrapping all docker commands |
+| `entrypoint.sh` | Runs on container start — key gen, setup, welcome banner |
+| `blueTeam_profile` | The `bt_*` shell functions, pre-loaded into the container |
+| `ssh_config` | SSH client config with ControlMaster for efficient connections |
+| `tmux.conf` | tmux dashboard config with status bar and mouse support |
+
+### Why `--network host`?
+
+The container runs with `--network host` — it shares your admin machine's actual
+network stack. This is required. Without it, `nmap` can't see your competition
+subnet and SSH can't reach your target machines. The `container_run.sh` and
+`docker-compose.yml` both set this automatically — you don't need to think about it.
+
+### Your Data Persists Between Container Restarts
+
+| Volume | What's Stored | Survives Container Stop? |
+|---|---|---|
+| `blueteam-keys` | Your SSH key pair | ✅ Yes — forever |
+| `blueteam-logs` | All script output logs | ✅ Yes — forever |
+| `blueteam-reports` | Incident reports | ✅ Yes — forever |
+| `blueteam-config` | Fleet hosts.txt | ✅ Yes — forever |
+
+SSH keys are generated once on first run and persist across every subsequent
+container start. Add your hosts once, they're remembered. Logs accumulate all day.
+
+### No Docker? Use Direct Install Instead
+
+```bash
+# Installs all the same tools directly on your Ubuntu admin machine
+sudo bash pcdc_admin_setup.sh
+source ~/.blueTeam_profile
+bt_help
+```
+
+Everything works identically — `bt_*` functions, covert remote execution,
+the dashboard, all of it. The container is just cleaner and more portable.
+
+---
+
 ## Network Enumeration — Know Your Terrain
 *(You Can't Defend What You Don't Know Exists)*
 
@@ -886,23 +1001,258 @@ RECOVERY LOST — red team found and removed your access
 
 ---
 
+### 🧅 `pcdc_securityonion.sh`
+**Security Onion integration bridge.**
+
+Security Onion is its own platform — you don't install it from this toolkit,
+you connect to it. This script is the bridge between your admin machine and
+a running SO instance, giving you alert streaming, custom rule deployment,
+and IOC hunting without having to live inside the SO web UI all day.
+
+> *Your host-based scripts see what's happening on individual machines.*
+> *Security Onion sees what's happening between them.*
+> *You need both. This script connects them.*
+
+**Four functions:**
+
+🔴 **`monitor`** — Polls the SO API every 30 seconds and streams alerts to your
+terminal, color-coded by severity. High alerts go straight to your incident log.
+One terminal running this means you never miss a network-level detection.
+
+📋 **`rules`** — Generates and deploys 25 custom Snort/Suricata detection rules
+tuned specifically for PCDC attack patterns that the default SO ruleset misses:
+reverse shells over common ports, PHP webshell POST patterns, DNS tunneling
+signatures, SSH/RDP/MySQL brute force, port scan detection, oversized ICMP,
+path traversal attempts, and data exfiltration by payload size.
+
+🔍 **`hunt`** — Given a suspicious IP, port, or signature from your host-based
+alerts, queries Security Onion for correlated network evidence. This is your
+pivot point — host artifact discovered, network confirmation sought.
+
+💓 **`status`** — Quick connectivity and auth check on your SO instance, plus
+direct links to the key SO interfaces: Alerts, Hunt, Dashboards, and PCAP.
+
+**Setup:**
+```bash
+# Point it at your SO instance before running
+export SO_HOST=10.0.1.x      # your Security Onion IP
+export SO_USER=your_user     # SO web UI username
+export SO_PASS=your_pass     # SO web UI password
+
+# Verify connectivity
+bash pcdc_securityonion.sh status
+
+# Stream alerts to your terminal (run in dedicated terminal)
+bash pcdc_securityonion.sh monitor
+
+# Deploy custom PCDC detection rules
+bash pcdc_securityonion.sh rules
+
+# Hunt for a specific IP you found in a host-based alert
+bash pcdc_securityonion.sh hunt
+```
+
+**What to look for:**
+```
+[SO-HIGH]  2026-04-12T09:14:22 | PCDC SSH Brute Force Detected
+           Src: 10.0.1.99:54231 → Dst: 10.0.1.10:22
+→ Brute force in progress. Cross-reference 10.0.1.99 — is it in your packet?
+  If not: unaccounted host on your VLAN. Ask White Team immediately.
+  Block at firewall. File incident report.
+
+[SO-HIGH]  2026-04-12T09:31:07 | PCDC SMB Lateral Movement Attempt
+           Src: 10.0.1.10:49822 → Dst: 10.0.1.11:445
+→ Red team pivoting from web server to database server over SMB.
+  Run pcdc_linux_audit.sh on both hosts immediately.
+  Check for new accounts, new scheduled tasks, new SUID binaries.
+
+[SO-MED]   2026-04-12T10:02:44 | PCDC Possible DNS Tunnel - Long Query
+           Src: 10.0.1.12:53341 → Dst: 8.8.8.8:53
+→ Database server making suspiciously long DNS queries.
+  bt_run_covert pcdc_alias_detector_v2.sh root@10.0.1.12
+  Check for iodine, dnscat processes.
+```
+
+> ⚠️ **Important:** SO API endpoints vary between Security Onion versions.
+> The script handles SO 2.x format and falls back to direct Elasticsearch
+> queries if the API path differs. Run `status` first to confirm connectivity
+> before competition day.
+
+---
+
 ## 🚀 Deployment
 *(Getting Your Arsenal to Astra 9)*
 
-```bash
-# Option A: Clone the repo (preferred)
-git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
-cd astra9-blue-team && chmod +x *.sh
+There are two ways to run this toolkit. Pick one before competition day and practice it.
 
-# Option B: SCP if git isn't available on competition systems
-scp *.sh user@target:/opt/blueTeam/
-ssh user@target "chmod +x /opt/blueTeam/*.sh"
+---
+
+### 🐳 Option A: Docker Container *(Recommended)*
+
+The container is the cleanest approach. Every dependency is pre-installed,
+every tool is the right version, and you go from zero to operational in two minutes.
+No `apt install`, no missing packages, no "it worked at home" surprises.
+
+> *Think of it as your hacking lair, pre-packed and ready to deploy.*
+> *Like a go-bag, but for cyber defense. And with more bash.*
+
+#### Prerequisites
+
+```bash
+# Install Docker on your Ubuntu admin machine (one time)
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+newgrp docker               # apply group change without logging out
+
+# Verify
+docker --version
 ```
 
-> **Important:** The packet prohibits USB drives and removable media.
-> Get GitHub whitelisted through your school's PCDC POC **before** competition day.
-> Discovering it's not whitelisted at T+0:05 is a completely preventable tragedy
-> that has definitely happened to other teams and definitely should not happen to you.
+#### Build the Image
+
+```bash
+# Clone the repo onto your admin machine
+git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
+cd astra9-blue-team
+
+# Build — downloads Ubuntu 22.04 and installs all tools
+# Takes 2-3 minutes on first build, much faster after (layer cache)
+bash container_run.sh build
+```
+
+> ⚠️ **Do this at home before competition day.**
+> Competition internet may be slow or restricted.
+> Build the image on your own network where you control the bandwidth.
+
+#### Save the Image for Offline Use *(Highly Recommended)*
+
+```bash
+# Save the built image to a file — no internet needed on competition day
+docker save astra9-blueteam:latest | gzip > astra9-blueteam.tar.gz
+
+# On competition day, load it directly
+docker load < astra9-blueteam.tar.gz
+
+# Verify it loaded
+docker images astra9-blueteam
+```
+
+The compressed image is around 500-600MB. Keep it somewhere you can access
+on competition day — your home directory, a pre-approved cloud drive, or
+pre-loaded onto your admin machine the night before.
+
+#### Run the Container
+
+```bash
+# Interactive — drops you straight into the Blue Team shell
+bash container_run.sh run
+
+# You'll see the banner, tool verification, and quick-start menu
+# SSH key is auto-generated on first run
+# bt_help shows all available commands
+```
+
+#### All Container Commands
+
+```bash
+bash container_run.sh build         # Build the image from scratch
+bash container_run.sh run           # Run interactively (most common)
+bash container_run.sh start         # Start in background
+bash container_run.sh attach        # Attach to a running background container
+bash container_run.sh status        # Show image, container, and volume status
+bash container_run.sh logs          # View container output
+bash container_run.sh export-logs   # Copy logs from container to host filesystem
+bash container_run.sh rebuild       # Full rebuild without cache (after code changes)
+bash container_run.sh clean         # Remove container and image (keeps volumes)
+```
+
+#### Container Volumes — Your Data Persists
+
+The container uses named Docker volumes so your data survives container restarts:
+
+| Volume | Contents | Lost on container stop? |
+|---|---|---|
+| `blueteam-keys` | SSH key pair | No — persists forever |
+| `blueteam-logs` | All script output logs | No — persists forever |
+| `blueteam-reports` | Incident reports | No — persists forever |
+| `blueteam-config` | hosts.txt fleet file | No — persists forever |
+
+```bash
+# Export logs from container to host filesystem at end of competition
+bash container_run.sh export-logs ./competition-logs
+```
+
+#### Why `--network host`?
+
+The container runs with `network_mode: host` — it shares your admin machine's
+actual network stack rather than running in an isolated Docker network.
+This is required for:
+- `nmap` to see and scan your actual VLAN subnet
+- SSH connections to reach your target machines
+- `tcpdump` to capture traffic on your real interface
+- Port checks in `bt_status_all` to reflect real network state
+
+Without `--network host`, the container would be talking to a virtual network
+that can't reach your competition machines. So that flag stays.
+
+---
+
+### 🔧 Option B: Direct Install *(No Docker)*
+
+If Docker isn't available or whitelisted, run the admin setup script directly
+on your Ubuntu machine instead.
+
+```bash
+# Clone the repo
+git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
+cd astra9-blue-team
+chmod +x *.sh
+
+# Run the admin setup — installs all dependencies, generates SSH key,
+# installs shell functions into ~/.blueTeam_profile
+sudo bash pcdc_admin_setup.sh
+
+# Load shell functions into your current session
+source ~/.blueTeam_profile
+
+# Verify tools are installed
+bt_help
+```
+
+The `pcdc_admin_setup.sh` script installs the same tools the Dockerfile does —
+nmap, sshpass, tmux, tshark, etc. — directly onto the host machine via apt.
+Everything else works identically to the container version.
+
+---
+
+### Getting Scripts onto Target Machines
+
+The preferred method is **never copying scripts to targets** — use `bt_run_covert`
+to pipe them through SSH stdin instead. Scripts execute in memory and leave
+no trace on the target filesystem.
+
+```bash
+# Covert single-host execution (script never written to target disk)
+bt_run_covert pcdc_linux_audit.sh root@10.0.1.10
+
+# Or hit every host simultaneously
+bt_run_all pcdc_linux_audit.sh
+```
+
+If you need to physically copy scripts for some reason:
+```bash
+# SCP to a specific target
+scp -i ~/blueTeam/keys/pcdc_admin pcdc_linux_audit.sh root@10.0.1.10:/tmp/
+ssh -i ~/blueTeam/keys/pcdc_admin root@10.0.1.10 "bash /tmp/pcdc_linux_audit.sh"
+```
+
+> **Whitelist reminder:** Get these domains approved through your PCDC POC
+> before competition day:
+> - `github.com` — to clone the repo
+> - `hub.docker.com` — to pull the Ubuntu base image (or pre-build offline)
+> - `archive.ubuntu.com` — for apt packages during image build
+>
+> If any of these are blocked, use the offline image approach above.
 
 ### 📺 Terminal Layout
 
@@ -911,7 +1261,7 @@ Your admin machine runs the show. Open these terminals on your Ubuntu client:
 | Terminal | Role | Command |
 |---|---|---|
 | 1 | 👁️ The Eye | `bt_dashboard` *(all hosts streaming auth.log)* |
-| 2 | 🌐 The Network | `bt_status_all` + periodic `pcdc_network_enum.sh` |
+| 2 | 🧅 The Onion | `bash pcdc_securityonion.sh monitor` *(SO alert stream)* |
 | 3 | 📢 The Voice *(Captain)* | Inject system + team comms |
 | 4 | 🤲 The Hands | `bt_run_covert` for targeted work + incident response |
 
@@ -925,47 +1275,61 @@ On each **target machine**, open two terminals via `bt_ssh`:
 ### ⏱️ Competition Timeline
 
 ```
+T-NIGHT  Night before competition — do this at home:
+         └─ git clone https://github.com/YOUR_USERNAME/astra9-blue-team.git
+            bash container_run.sh build
+            docker save astra9-blueteam:latest | gzip > astra9-blueteam.tar.gz
+            Change recovery account username in pcdc_recovery_access.sh
+            Copy .ps1 scripts to a location accessible on competition day
+            Practice: bash container_run.sh run → bt_help
+
 T-1 DAY  Pre-competition prep on your admin machine:
-         └─ sudo bash pcdc_admin_setup.sh
-            Installs tools, generates SSH key, sets up shell functions.
-            Change the recovery account username in pcdc_recovery_access.sh
-            from 'svcmon' to something scenario-appropriate.
+         └─ docker load < astra9-blueteam.tar.gz   ← if not pre-loaded
+            bash container_run.sh run               ← verify everything works
+            Confirm hosts.txt is ready for your packet machines
 
 T+0:00  Access granted. Clock is ticking.
         │
-        ├─ ADMIN MACHINE:
-        │   source ~/.blueTeam_profile
+        ├─ LINUX ADMIN MACHINE (container):
+        │   bash container_run.sh run
         │   sudo bash pcdc_network_enum.sh          ← MAP THE NETWORK FIRST
         │   sudo bash pcdc_ssh_validator.sh         ← find what credentials work
         │   bt_push_key_all "packetpassword"        ← deploy SSH keys everywhere
-        │   bt_run_all pcdc_linux_audit.sh          ← audit every host at once
+        │   bt_run_all pcdc_linux_audit.sh          ← audit every Linux host at once
         │   bt_run_all pcdc_recovery_access.sh      ← plant recovery access NOW
         │   bash pcdc_recovery_check.sh             ← verify it all worked
+        │   bt_run_covert pcdc_linux_harden.sh      ← harden each Linux machine
         │
-        └─ TARGET MACHINES (via bt_run_covert):
-            pcdc_linux_harden.sh                   ← harden each machine
-            pcdc_alias_detector_v2.sh              ← check for pre-infection
-            pcdc_webapp_audit.sh                   ← hunt pre-planted webshells
-            pcdc_privesc_detector.sh               ← check privesc exposure
+        └─ WINDOWS MACHINES (simultaneously — assign one person per box):
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            .\pcdc_win_audit.ps1                    ← audit first, always
+            .\pcdc_win_ad_audit.ps1                 ← if DC is in your packet
+            .\pcdc_win_harden.ps1                   ← harden interactively
 
 T+0:XX  Red team attacks begin. Grace period over.
-        └─ ADMIN MACHINE:
-            bt_dashboard                           ← live log view, all hosts
-            bt_status_all                          ← periodic service health
-           TARGET MACHINES:
-            pcdc_port_monitor_v2.sh --paranoid     ← Terminal 1 each box
-            pcdc_linux_monitor.sh 45               ← Terminal 2 each box
+        └─ LINUX ADMIN MACHINE:
+            bash pcdc_securityonion.sh monitor      ← Terminal 2 (SO alert stream)
+            bash pcdc_securityonion.sh rules        ← deploy custom detection rules
+            bt_dashboard                            ← Terminal 1 (host log view)
+           LINUX TARGETS — dedicated terminals:
+            pcdc_port_monitor_v2.sh --paranoid      ← Terminal 1 each box
+            pcdc_linux_monitor.sh 45                ← Terminal 2 each box
+           WINDOWS TARGETS — dedicated PowerShell window:
+            .\pcdc_win_monitor.ps1 -Interval 45 -Services "w3svc","dns"
 
 Every 30 min:
         └─ bash pcdc_recovery_check.sh             ← recovery paths still intact?
-           bt_run_all pcdc_alias_detector_v2.sh    ← shells still clean?
+           bt_run_all pcdc_alias_detector_v2.sh    ← Linux shells still clean?
            bt_run_all pcdc_webapp_audit.sh         ← any new webshells?
            bt_run_all pcdc_privesc_detector.sh     ← new SUID? sudo changes?
            sudo bash pcdc_network_enum.sh          ← any new hosts appeared?
+           (Windows — press 'r' in monitor window) ← Windows incident report
 
 On any [ALERT]:
-        └─ sudo /bin/bash pcdc_runbook.sh triage   ← work the problem
-           sudo bash pcdc_incident_report.sh       ← recover those points
+        └─ Linux: sudo /bin/bash pcdc_runbook.sh triage
+           Windows: Stop-Process -Id <PID> -Force  ← kill the threat
+           Both: sudo bash pcdc_incident_report.sh ← recover those points
+```
 
 On lockout:
         └─ ssh -i ~/blueTeam/keys/pcdc_admin svcmon@<host>
@@ -1015,37 +1379,368 @@ Bring both directories to your end-of-day presentation.
 
 | Script | Category | When to Run | Where to Run |
 |---|---|---|---|
-| `pcdc_admin_setup.sh` | Admin | Once, pre-competition | Admin machine |
-| `pcdc_network_enum.sh` | Recon | T+0:00, then every 30 min | Admin machine |
-| `pcdc_ssh_validator.sh` | Recon | T+0:05 after enum | Admin machine |
-| `pcdc_recovery_access.sh` | Recovery | T+0:10, before attacks | Admin machine → targets via `bt_run_covert` |
-| `pcdc_recovery_check.sh` | Recovery | Every 30 min | Admin machine |
-| `pcdc_linux_audit.sh` | Audit | T+0:00, once per machine | Target (or via `bt_run_all`) |
-| `pcdc_linux_harden.sh` | Hardening | T+0:05, after audit | Target (or via `bt_run_covert`) |
-| `pcdc_alias_detector_v2.sh` | Detection | T+0:10, then every 30 min | Target (or via `bt_run_all`) |
-| `pcdc_webapp_audit.sh` | Detection | T+0:10, then every 30 min | Target (or via `bt_run_all`) |
-| `pcdc_privesc_detector.sh` | Detection | T+0:10, then every 30 min | Target (or via `bt_run_all`) |
-| `pcdc_port_monitor_v2.sh` | Monitoring | Continuous, dedicated terminal | Target |
-| `pcdc_linux_monitor.sh` | Monitoring | Continuous, dedicated terminal | Target |
-| `pcdc_soceng_defense.sh` | Defense | On any suspicious inject | Admin machine |
-| `pcdc_incident_report.sh` | Response | Every detected attack | Target or Admin |
-| `pcdc_runbook.sh` | Orchestration | Phase transitions | Target |
-| `pcdc_alias_detector.sh` | Detection | Legacy/lightweight use | Target |
-| `pcdc_port_monitor.sh` | Monitoring | Legacy/lightweight use | Target |
+| `pcdc_admin_setup.sh` | Admin | Once, pre-competition | Linux admin machine |
+| `pcdc_network_enum.sh` | Recon | T+0:00, then every 30 min | Linux admin machine |
+| `pcdc_ssh_validator.sh` | Recon | T+0:05 after enum | Linux admin machine |
+| `pcdc_recovery_access.sh` | Recovery | T+0:10, before attacks | Linux admin → targets via `bt_run_covert` |
+| `pcdc_recovery_check.sh` | Recovery | Every 30 min | Linux admin machine |
+| `pcdc_securityonion.sh` | NSM Bridge | T+0:00 status, then monitor | Linux admin machine |
+| `pcdc_linux_audit.sh` | Audit | T+0:00, once per machine | Linux targets |
+| `pcdc_linux_harden.sh` | Hardening | T+0:05, after audit | Linux targets |
+| `pcdc_alias_detector_v2.sh` | Detection | T+0:10, then every 30 min | Linux targets |
+| `pcdc_webapp_audit.sh` | Detection | T+0:10, then every 30 min | Linux targets |
+| `pcdc_privesc_detector.sh` | Detection | T+0:10, then every 30 min | Linux targets |
+| `pcdc_port_monitor_v2.sh` | Monitoring | Continuous, dedicated terminal | Linux targets |
+| `pcdc_linux_monitor.sh` | Monitoring | Continuous, dedicated terminal | Linux targets |
+| `pcdc_soceng_defense.sh` | Defense | On any suspicious inject | Any machine |
+| `pcdc_incident_report.sh` | Response | Every detected attack | Any machine |
+| `pcdc_runbook.sh` | Orchestration | Phase transitions | Linux targets |
+| **`pcdc_win_audit.ps1`** | **Audit** | **T+0:00, every Windows machine** | **Windows targets** |
+| **`pcdc_win_harden.ps1`** | **Hardening** | **T+0:05, after audit** | **Windows targets** |
+| **`pcdc_win_monitor.ps1`** | **Monitoring** | **Continuous, dedicated window** | **Windows targets** |
+| **`pcdc_win_ad_audit.ps1`** | **AD Audit** | **T+0:00 if DC in packet** | **Domain Controller** |
+| `pcdc_alias_detector.sh` | Detection | Legacy/lightweight use | Linux targets |
+| `pcdc_port_monitor.sh` | Monitoring | Legacy/lightweight use | Linux targets |
 
 ---
 
 ## 🚫 What These Scripts Don't Cover
 *(Honest Limitations, Because Overconfidence is a Vulnerability)*
 
-**Windows.** Entirely Linux-only. The competition has Windows machines.
-Active Directory, IIS, Windows Server — that's on you.
-CIS Benchmarks are your friend. Don't forget to rename Administrator.
+---
+
+## 🪟 Windows Toolkit
+*(Because Half Your Machines Run Windows and Your Windows Teammates Deserve Tools Too)*
+
+> *"In every competition there is one Windows machine that nobody hardened.*
+> *Don't let that be your Windows machine."*
+
+Four PowerShell scripts covering the same depth as the Linux toolkit.
+All run on Windows 10, 11, Server 2016, Server 2019 — everything the
+PCDC packet lists as possible Windows targets.
+
+### First Things First — Execution Policy
+
+PowerShell blocks script execution by default. Run this on every Windows
+machine before anything else:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+```
+
+This applies to the current session only — doesn't persist, doesn't
+require a reboot, completely reversible.
+
+---
+
+### 🔭 `pcdc_win_audit.ps1`
+**Read-only Windows system audit. Run this first on every Windows machine.**
+
+Same philosophy as `pcdc_linux_audit.sh` — touches nothing, changes nothing,
+documents everything. Your pre-flight checklist for Windows.
+
+**What it checks:**
+- All local user accounts — enabled status, last login, password expiry
+- Local Administrators group — who's in there that shouldn't be
+- Accounts with no password required *(open doors)*
+- Accounts with password never set to expire *(forgotten service accounts)*
+- Recently created accounts in the last 7 days
+- Password policy via `secedit` — minimum length, complexity, lockout threshold
+- All listening TCP/UDP ports with owning process name and PID
+- Established connections — flags shells/scripts with network connections
+- Routing table and DNS configuration
+- Hosts file entries *(red team loves planting entries here)*
+- Network shares — flags non-admin shares
+- SMBv1 status *(EternalBlue/WannaCry vector)*
+- SMB signing status *(relay attack protection)*
+- Running services — non-standard binary paths flagged
+- Services set to auto-start but currently stopped
+- Non-Microsoft scheduled tasks *(primary Windows persistence location)*
+- Registry Run keys — HKLM and HKCU *(startup persistence)*
+- Winlogon registry entries *(advanced persistence)*
+- Windows Firewall status across all profiles
+- Custom firewall rules
+- Windows Defender status and real-time protection
+- Running processes — flags injected/hollow processes with no file path
+- PowerShell processes with their full command lines
+- RDP configuration and NLA status
+- Recent Security event log — logins, failures, account changes, brute force
+- Installed software — flags known attack tools
+- Patch status and pending Windows Updates
+
+**Usage:**
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\pcdc_win_audit.ps1
+```
+
+**What to look for:**
+```
+[BAD]   SMBv1 ENABLED — EternalBlue/WannaCry risk
+→ Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+
+[BAD]   Firewall DISABLED: Public profile — CRITICAL
+→ Set-NetFirewallProfile -Profile Public -Enabled True
+
+[WARN]  Non-standard path: SuspiciousSvc → C:\Users\Public\svc.exe
+→ Get-Process, check what that binary actually is, remove if rogue
+
+[WARN]  Non-Microsoft scheduled task: UpdateHelper → C:\Temp\update.ps1
+→ Disable-ScheduledTask, investigate the script
+
+[WARN]  SHELL HAS NETWORK CONNECTION: powershell.exe (PID 4821) → 10.0.1.99:4444
+→ Reverse shell. Stop-Process -Id 4821 -Force, then investigate entry point
+```
+
+---
+
+### 🔒 `pcdc_win_harden.ps1`
+**Interactive Windows hardening. Prompts before every change.**
+
+The Windows equivalent of `pcdc_linux_harden.sh`. Walks through every
+hardening step, asking confirmation before anything significant.
+
+> ⚠️ **Run `pcdc_win_audit.ps1` first** so you know what you're hardening.
+> **Do NOT reboot during competition** unless absolutely necessary — it
+> disrupts scored services and costs points.
+
+**What it does:**
+- Password resets for all enabled local accounts
+- Account lockdown — disable/remove suspicious accounts, review admin group
+- Rename the built-in Administrator account
+- Disable Guest account
+- Password policy hardening — min 12 chars, complexity, lockout after 5
+- Windows Firewall — enable all profiles, set default inbound to block,
+  add rules for each scored service
+- SMBv1 — disable it, every time, no exceptions
+- SMB signing — require it to prevent relay attacks
+- Remove non-admin shares you don't recognize
+- RDP hardening — require NLA, optionally restrict to specific IP
+- Stop and disable unnecessary services (Telnet, SNMP, Remote Registry, etc.)
+- Disable suspicious scheduled tasks
+- Clean up registry Run key persistence entries
+- Windows Defender — enable real-time protection, behavior monitoring,
+  network protection, cloud protection
+- Comprehensive audit policy — enables logging for all critical event categories
+- Increases Security event log to 100MB so logs don't roll over
+- Windows Update — finds and installs pending patches
+
+**Usage:**
+```powershell
+# Must run as Administrator
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\pcdc_win_harden.ps1
+```
+
+**After running — verify these immediately:**
+```powershell
+# Confirm scored services still running
+Get-Service w3svc, mssqlserver, dns, lanmanserver | Select Name, Status
+
+# Confirm firewall is up but not blocking the scorer
+Test-NetConnection -ComputerName <scoring_engine_ip> -Port 80
+
+# Confirm RDP still reachable if it's scored
+Test-NetConnection -ComputerName localhost -Port 3389
+```
+
+---
+
+### 👁️ `pcdc_win_monitor.ps1`
+**Continuous Windows system monitor. Run in a dedicated PowerShell window.**
+
+Baselines the system at startup then diffs every cycle — the Windows
+equivalent of `pcdc_linux_monitor.sh`. Press `r` to generate an
+instant incident report. Jitters its sleep interval to prevent red team
+timing attacks between checks.
+
+**What it monitors:**
+- New local user accounts since baseline
+- New members added to local Administrators group
+- New listening ports — name and owning process
+- New services installed since baseline
+- New scheduled tasks since baseline
+- New registry Run key entries *(persistence)*
+- Shells/script engines with active network connections *(reverse shells)*
+- Brute force detection — 10+ failed logins in 2 minutes
+- Scored service health with auto-restart attempt
+- Windows Defender disabled or real-time protection turned off
+- New network shares created
+
+**Usage:**
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
+# Specify your scored services by name
+.\pcdc_win_monitor.ps1 -Interval 45 -Services "w3svc","dns","mssqlserver"
+
+# Press 'r' to generate an instant incident report
+```
+
+**What to look for:**
+```
+[ALERT]   NEW LOCAL ADMINISTRATOR: DOMAIN\suspicious_user
+→ Remove immediately: Remove-LocalGroupMember -Group Administrators -Member suspicious_user
+  Then investigate how they got added. File incident report.
+
+[ALERT]   NEW LISTENING PORT: 0.0.0.0:4444 owned by powershell (PID 6621)
+→ Stop-Process -Id 6621 -Force
+  Then investigate: Get-WinEvent -LogName Security | Where Id -eq 4688
+
+[ALERT]   SCORED SERVICE DOWN: w3svc — attempting restart
+→ Monitor auto-restart. If it fails: Get-EventLog -LogName System -Source *IIS* -Newest 10
+
+[ALERT]   WINDOWS DEFENDER DISABLED — was enabled at baseline
+→ Set-MpPreference -DisableRealtimeMonitoring $false
+  Then investigate who disabled it and how.
+```
+
+---
+
+### 🏰 `pcdc_win_ad_audit.ps1`
+**Active Directory audit. Run this if ANY machine in your packet is a DC.**
+
+If your Blue Team Packet includes a Domain Controller, this script is
+mandatory. AD is the crown jewel of any Windows network — owning it
+means owning every machine in the domain. Red team knows this. This
+script checks for every classic AD attack setup vector.
+
+> *"Domain Admins should have as few members as your team has fingers.*
+> *If you need both hands to count them, that's too many."*
+
+**What it checks:**
+- Membership in all privileged groups — Domain Admins, Enterprise Admins,
+  Schema Admins, Account Operators, Backup Operators, Server Operators
+- **Kerberoastable accounts** — users with SPNs set. Red team can request
+  their service tickets and crack them offline. Fix: strong 25+ char
+  passwords or migrate to Group Managed Service Accounts (gMSA)
+- **AS-REP roastable accounts** — accounts with pre-auth disabled. Red team
+  can request their hash without any credentials. Fix: enable pre-auth
+- **AdminCount=1 accounts** — historically privileged accounts with relaxed
+  ACL inheritance. Common lateral movement target
+- Password-never-expires accounts *(forgotten service accounts = weak passwords)*
+- Stale accounts not logged in for 30+ days
+- Recently created domain accounts *(red team may have added one)*
+- Group Policy Objects sorted by modification time — new/modified GPOs
+  are a classic persistence mechanism
+- Domain trusts — bidirectional trusts mean compromise propagates both ways
+- SYSVOL and NETLOGON scripts — recently modified scripts are a red flag
+- DC event logs for **DCSync indicators** (Event 4662 with replication GUIDs)
+- DC event logs for **Golden Ticket indicators** (RC4 Kerberos in an AES domain)
+- DC event logs for **Pass-the-Hash** (NTLM network logons)
+- krbtgt password age — old krbtgt = Golden Tickets potentially still valid
+
+**Usage:**
+```powershell
+# On a DC or machine with RSAT AD tools
+Set-ExecutionPolicy Bypass -Scope Process -Force
+Import-Module ActiveDirectory
+.\pcdc_win_ad_audit.ps1
+
+# Install RSAT if needed:
+Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+```
+
+**What to look for:**
+```
+[BAD]   Kerberoastable: svc_backup | SPNs: MSSQLSvc/db01.corp.local
+→ Set a 25+ character random password on this account immediately.
+  Better: migrate to gMSA (Group Managed Service Account)
+
+[BAD]   AS-REP Roastable: jsmith
+→ Set-ADUser jsmith -KerberosEncryptionType AES256
+  (This enables pre-authentication requirement)
+
+[BAD]   [RECENT] GPO: WindowsUpdate_Settings — MODIFIED 2h ago
+→ Someone modified a GPO recently. Get-GPOReport to see what changed.
+  Red team uses GPOs for persistence and lateral movement.
+
+[BAD]   POSSIBLE DCSYNC: 2026-04-12 10:23:44
+→ Someone may have performed a DCSync attack (dumped all password hashes).
+  Treat ALL domain credentials as compromised. Reset krbtgt TWICE.
+  Reset all privileged account passwords immediately.
+```
+
+---
+
+### 🪟 Windows Day-of Workflow
+
+```powershell
+# T+0:00 — On every Windows machine simultaneously
+
+# 1. Enable script execution
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
+# 2. Audit first — understand before touching
+.\pcdc_win_audit.ps1
+
+# 3. If there's a DC — audit AD immediately
+Import-Module ActiveDirectory
+.\pcdc_win_ad_audit.ps1
+
+# 4. Harden — interactive, prompts before each change
+.\pcdc_win_harden.ps1
+
+# 5. Monitor — dedicated PowerShell window, runs all competition
+.\pcdc_win_monitor.ps1 -Interval 45 -Services "w3svc","dns","mssqlserver"
+# Press 'r' to generate incident report when attacks are detected
+```
+
+### Windows Quick Reference — Commands to Know Cold
+
+```powershell
+# User management
+Get-LocalUser                                    # list all local users
+Get-LocalGroupMember -Group "Administrators"     # list local admins
+New-LocalUser "username" -Password (Read-Host -AsSecureString)
+Disable-LocalUser "username"
+Remove-LocalUser "username"
+
+# Service management
+Get-Service | Where Status -eq Running           # running services
+Start-Service "servicename"
+Stop-Service "servicename"
+Set-Service "servicename" -StartupType Disabled
+
+# Network
+Get-NetTCPConnection -State Listen               # open ports
+Get-NetTCPConnection -State Established          # active connections
+Get-NetFirewallProfile                           # firewall status
+New-NetFirewallRule -DisplayName "Allow80" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
+
+# Process investigation
+Get-Process | Sort CPU -Descending              # top processes by CPU
+Get-Process -Id <PID>                           # specific process
+(Get-CimInstance Win32_Process -Filter "ProcessId=<PID>").CommandLine
+Stop-Process -Id <PID> -Force                   # kill process
+
+# Scheduled tasks
+Get-ScheduledTask | Where State -ne Disabled    # all active tasks
+Disable-ScheduledTask -TaskName "name"
+Remove-ScheduledTask -TaskName "name" -Confirm:$false
+
+# Event logs
+Get-WinEvent -LogName Security -MaxEvents 50    # recent security events
+Get-WinEvent -LogName Security | Where Id -eq 4625 | Select -First 20  # failed logins
+
+# SMB
+Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force   # disable SMBv1
+Get-SmbShare                                    # list shares
+Remove-SmbShare -Name "sharename" -Force        # remove share
+
+# Windows Defender
+Get-MpComputerStatus                            # defender status
+Set-MpPreference -DisableRealtimeMonitoring $false  # enable real-time
+Start-MpScan -ScanType QuickScan               # quick scan
+```
 
 **Security Onion.** The packet specifically recommends it, and they're right.
-Assign one person as your dedicated Snort/Zeek analyst.
-These scripts see individual hosts; Security Onion sees lateral movement between them.
-Host-only tooling is blind to the network layer. Don't be blind to the network layer.
+Assign one person as your dedicated Snort/Zeek analyst with `pcdc_securityonion.sh monitor`
+running in their terminal. The SO integration script bridges your toolkit to a running
+SO instance — it streams alerts, deploys custom rules, and lets you hunt for network
+evidence correlated to host-based findings. What it can't do is replace having someone
+actually watching the SO dashboards and PCAP viewer for anomalies that don't trigger
+a rule. Human eyes on Security Onion are irreplaceable.
 
 **The scoring engine.** Find out which IPs and ports Gold Team uses to check your
 services. Whitelist them *before* applying default-deny firewall rules.
