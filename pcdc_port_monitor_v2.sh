@@ -571,7 +571,7 @@ check_reverse_shell_indicators() {
 # NEW LISTENERS + OLD v1 CHECKS (kept and improved)
 # ============================================================
 check_new_listeners() {
-    ss -tulnp 2>/dev/null | tail -n +2 | while read proto rq sq local foreign state proc; do
+    ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _rq _sq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         echo "$port $proc"
     done | sort -n > "$STATE_DIR/listeners.current"

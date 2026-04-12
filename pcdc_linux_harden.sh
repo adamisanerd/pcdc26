@@ -170,7 +170,7 @@ find /home /root -name "authorized_keys" 2>/dev/null | while read keyfile; do
     if confirm "Clear authorized_keys at $keyfile?"; then
         # Back it up first
         cp "$keyfile" "${keyfile}.bak.${TIMESTAMP}"
-        > "$keyfile"
+        : > "$keyfile"
         chmod 600 "$keyfile"
         ok "Cleared $keyfile (backup saved)"
     fi

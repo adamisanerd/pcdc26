@@ -279,7 +279,7 @@ for pamdir in "$PAM_DIR" "$PAM_DIR64" "$PAM_DIR_ALT"; do
         done < "$PAMHASH_FILE"
 
         # Check for NEW pam modules added since baseline
-        sha256sum "$pamdir"/*.so 2>/dev/null | while read hash file; do
+        sha256sum "$pamdir"/*.so 2>/dev/null | while read -r _hash file; do
             if ! grep -q "$file" "$PAMHASH_FILE"; then
                 alert "NEW PAM MODULE ADDED: $file"
                 log_incident "NEW PAM MODULE" "$file"

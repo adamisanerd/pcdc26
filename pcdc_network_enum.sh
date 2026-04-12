@@ -169,7 +169,7 @@ else
     # Manual ping sweep fallback
     SUBNET_BASE=$(echo "$TARGET_SUBNET" | cut -d'/' -f1 | cut -d'.' -f1-3)
     info "Manual ping sweep of $SUBNET_BASE.0/24..."
-    > "$STATE_DIR/live_ips_$TIMESTAMP.txt"
+    : > "$STATE_DIR/live_ips_$TIMESTAMP.txt"
     for i in $(seq 1 254); do
         ip="$SUBNET_BASE.$i"
         if ping -c 1 -W 1 "$ip" &>/dev/null 2>&1; then

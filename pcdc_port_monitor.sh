@@ -125,7 +125,7 @@ capture_baseline() {
 # Any port that wasn't open at baseline
 # ============================================================
 check_new_listeners() {
-    ss -tulnp 2>/dev/null | tail -n +2 | while read proto recvq sendq local foreign state proc; do
+    ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _recvq _sendq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         echo "$port $proc"
     done | sort -n > "$STATE_DIR/listeners.current"

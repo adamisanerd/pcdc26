@@ -136,7 +136,6 @@ check_new_processes() {
 }
 
 check_cron_changes() {
-    local current_crons
     for user in $(cut -f1 -d: /etc/passwd); do
         crontab -u "$user" -l 2>/dev/null
     done | sort > "$STATE_DIR/crons.current"
@@ -267,7 +266,8 @@ check_services() {
 # INCIDENT REPORT GENERATOR
 # ============================================================
 generate_incident_report() {
-    local outfile="$LOGDIR/incident_report_$(date +%Y%m%d_%H%M%S).txt"
+    local outfile
+    outfile="$LOGDIR/incident_report_$(date +%Y%m%d_%H%M%S).txt"
     cat > "$outfile" << EOF
 ============================================================
 PCDC 2026 | ASTRA 9 BLUE TEAM
