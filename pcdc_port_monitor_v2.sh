@@ -269,7 +269,7 @@ check_ipv6_listeners() {
     done
 
     # Specifically flag IPv6 listeners on non-standard ports
-    ss -tulnp 2>/dev/null | grep -E "\[|::" | while read proto rq sq local foreign state proc; do
+    ss -tulnp 2>/dev/null | grep -E "\[|::" | while read -r _proto _rq _sq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         binary=$(echo "$proc" | grep -oP '"[^"]*"' | head -1 | tr -d '"')
         if [ -z "${KNOWN_PORTS[$port]}" ]; then
@@ -463,7 +463,7 @@ check_port_owner_deep() {
     section "DEEP PORT OWNER VERIFICATION"
     info "Verifying port owners via /proc/PID/exe (bypasses binary renaming)..."
 
-    ss -tulnp 2>/dev/null | tail -n +2 | while read proto rq sq local foreign state proc; do
+    ss -tulnp 2>/dev/null | tail -n +2 | while read -r _proto _rq _sq local _foreign _state proc; do
         port=$(echo "$local" | rev | cut -d: -f1 | rev)
         binary=$(echo "$proc" | grep -oP '"[^"]*"' | head -1 | tr -d '"')
         pid=$(echo "$proc" | grep -oP 'pid=\K[0-9]+' | head -1)
