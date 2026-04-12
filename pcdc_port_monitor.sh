@@ -32,6 +32,19 @@ STATE_DIR="$LOGDIR/portstate"
 mkdir -p "$LOGDIR" "$STATE_DIR"
 exec > >(tee -a "$LOGFILE") 2>&1
 
+# ============================================================
+# COMPETITION CONFIG (load if available — sets OOB trust rules)
+# ============================================================
+is_trusted_infrastructure() { return 1; }           # stub — overridden by config
+infra_note() { echo -e "${CYN}[INFO]${NC}     [INFRA] $1"; }
+OOB_PREFIX="${OOB_PREFIX:-192.168.40}"
+SCORING_ENGINE_IP="${SCORING_ENGINE_IP:-192.168.20.10}"
+
+_CONF_FILE="$(dirname "$(readlink -f "$0")")/pcdc_competition_config.sh"
+# shellcheck source=pcdc_competition_config.sh
+[ -f "$_CONF_FILE" ] && source "$_CONF_FILE"
+unset _CONF_FILE
+
 ok()      { echo -e "${GRN}[OK]${NC}      $1"; }
 warn()    { echo -e "${YLW}[WARN]${NC}    $1"; }
 alert()   {
@@ -219,10 +232,13 @@ check_connection_volume() {
 check_foreign_ip_diversity() {
     section "FOREIGN IP ANALYSIS"
 
-    info "Distinct foreign IPs per local port:"
-    ss -tnp 2>/dev/null | awk 'NR>1 {print $4, $5}' | while read local foreign; do
+    info "Distinct foreign IPs per local port (excluding trusted infra):"
+    ss -tnp 2>/dev/null | awk 'NR>1 {print $4, $5}' | while read -r local foreign; do
         local_port=$(echo "$local" | rev | cut -d: -f1 | rev)
         foreign_ip=$(echo "$foreign" | rev | cut -d: -f2- | rev)
+        if is_trusted_infrastructure "$foreign_ip"; then
+            continue
+        fi
         echo "$local_port $foreign_ip"
     done | sort | uniq | awk '{print $1}' | sort | uniq -c | sort -rn | while read count port; do
         if [ "$count" -gt "$FOREIGN_THRESHOLD" ]; then
@@ -311,12 +327,16 @@ check_connection_owners() {
         # Flag shell or tool owning a network connection
         for sus in "${SUSPICIOUS_PROCS[@]}"; do
             if [[ "$binary" == "$sus" ]]; then
-                alert "SUSPICIOUS BINARY HAS NETWORK CONNECTION: $binary (PID $pid) → $foreign_ip:$foreign_port"
-                if [ -n "$pid" ]; then
-                    info "Full command: $(cat /proc/$pid/cmdline 2>/dev/null | tr '\0' ' ')"
+                if is_trusted_infrastructure "$foreign_ip"; then
+                    infra_note "Suspicious binary to trusted infra (review): $binary (PID $pid) → $foreign_ip:$foreign_port"
+                else
+                    alert "SUSPICIOUS BINARY HAS NETWORK CONNECTION: $binary (PID $pid) → $foreign_ip:$foreign_port"
+                    if [ -n "$pid" ]; then
+                        info "Full command: $(cat /proc/$pid/cmdline 2>/dev/null | tr '\0' ' ')"
+                    fi
+                    log_incident "SHELL/TOOL NETWORK CONNECTION" \
+                        "$binary (PID $pid) connected to $foreign_ip:$foreign_port" "$foreign_ip"
                 fi
-                log_incident "SHELL/TOOL NETWORK CONNECTION" \
-                    "$binary (PID $pid) connected to $foreign_ip:$foreign_port" "$foreign_ip"
             fi
         done
 
@@ -361,6 +381,7 @@ echo "  Host:     $(hostname)"
 echo "  IP:       $(hostname -I | awk '{print $1}')"
 echo "  Log:      $LOGFILE"
 echo "  Incident: $INCIDENT_LOG"
+echo "  Trusted:  OOB ${OOB_PREFIX}.x + scoring ${SCORING_ENGINE_IP}"
 echo ""
 echo -e "${YLW}  Edit KNOWN_PORTS at top of script to match your scored services!${NC}"
 echo ""

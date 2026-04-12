@@ -22,6 +22,19 @@ mkdir -p "$LOGDIR" "$STATE_DIR"
 
 INTERVAL=${1:-60}  # default: check every 60 seconds
 
+# ============================================================
+# COMPETITION CONFIG (load if available — sets OOB trust rules)
+# ============================================================
+is_trusted_infrastructure() { return 1; }           # stub — overridden by config
+infra_note() { echo -e "${CYN}[INFO]${NC}     [INFRA] $1"; }
+OOB_PREFIX="${OOB_PREFIX:-192.168.40}"
+SCORING_ENGINE_IP="${SCORING_ENGINE_IP:-192.168.20.10}"
+
+_CONF_FILE="$(dirname "$(readlink -f "$0")")/pcdc_competition_config.sh"
+# shellcheck source=pcdc_competition_config.sh
+[ -f "$_CONF_FILE" ] && source "$_CONF_FILE"
+unset _CONF_FILE
+
 ok()       { echo -e "${GRN}[OK]${NC}       $1"; }
 warn()     { echo -e "${YLW}[WARN]${NC}     $1"; }
 alert()    { 
@@ -189,8 +202,12 @@ check_failed_logins() {
         local attacking_ip
         attacking_ip=$(grep "Failed password" /var/log/auth.log 2>/dev/null | tail -20 | \
             grep -oP 'from \K[\d.]+' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
-        alert "BRUTE FORCE DETECTED: $fail_count failures in last 2 min. Top source: $attacking_ip"
-        log_incident "BRUTE FORCE ATTACK" "$fail_count failed attempts" "$attacking_ip"
+        if is_trusted_infrastructure "$attacking_ip"; then
+            infra_note "Login failures from OOB/scoring IP $attacking_ip ($fail_count) — may be credential scoring checks"
+        else
+            alert "BRUTE FORCE DETECTED: $fail_count failures in last 2 min. Top source: $attacking_ip"
+            log_incident "BRUTE FORCE ATTACK" "$fail_count failed attempts" "$attacking_ip"
+        fi
     fi
 }
 
@@ -202,21 +219,33 @@ check_temp_executables() {
 }
 
 check_outbound_connections() {
-    # Look for unexpected outbound — flag non-standard ports
+    # Look for unexpected outbound — flag non-standard ports, skip OOB/scoring IPs
     ss -tnp state established 2>/dev/null | grep -v -E ':22 |:80 |:443 |:25 |:53 |:3306 |:5432 ' | \
-    grep -v "ESTABLISHED" | head -5 | while read line; do
-        warn "Unusual outbound connection: $line"
+    grep -v "ESTABLISHED" | head -5 | while read -r line; do
+        local f_ip
+        f_ip=$(echo "$line" | awk '{print $5}' | rev | cut -d: -f2- | rev)
+        if is_trusted_infrastructure "$f_ip"; then
+            infra_note "OOB/scoring connection (expected): $line"
+        else
+            warn "Unusual outbound connection: $line"
+        fi
     done
 
     # Look for established connections with suspicious foreign IPs
-    ss -tnp state established 2>/dev/null | tail -n +2 | while read line; do
+    ss -tnp state established 2>/dev/null | tail -n +2 | while read -r line; do
         local foreign
         foreign=$(echo "$line" | awk '{print $5}')
         local port
         port=$(echo "$foreign" | rev | cut -d: -f1 | rev)
+        local f_ip
+        f_ip=$(echo "$foreign" | rev | cut -d: -f2- | rev)
         # Flag high ephemeral ports making inbound connections (potential reverse shells)
         if [[ "$port" -gt 1024 ]] && [[ "$port" -lt 65535 ]]; then
-            info "Established: $line"
+            if is_trusted_infrastructure "$f_ip"; then
+                infra_note "OOB/scoring established: $line"
+            else
+                info "Established: $line"
+            fi
         fi
     done
 }
@@ -234,13 +263,25 @@ check_deleted_but_running() {
 # ============================================================
 # SERVICE HEALTH CHECK
 # ============================================================
-SCORED_SERVICES=()  # Populated at runtime via argument or prompt
+SCORED_SERVICES=()  # Populated at runtime via prompt (pre-seeded from config)
 
 prompt_services() {
     echo ""
-    info "Enter the names of your scored services (space-separated)."
-    info "Examples: apache2 nginx mysql ssh named vsftpd postfix smbd"
-    read -rp "Services: " -a SCORED_SERVICES
+    # Pre-populate from competition config if loaded
+    if [ -n "${COMP_SCORED_SERVICES[*]:-}" ]; then
+        SCORED_SERVICES=("${COMP_SCORED_SERVICES[@]}")
+        info "Pre-loaded scored services from competition config:"
+        info "  ${COMP_SCORED_SERVICES[*]}"
+        echo ""
+        read -rp "  Add/override services (space-separated, or Enter to use above): " -a _extra
+        if [ -n "${_extra[*]:-}" ]; then
+            SCORED_SERVICES=("${_extra[@]}")
+        fi
+    else
+        info "Enter the names of your scored services (space-separated)."
+        info "Examples: apache2 nginx mysql sshd named vsftpd postfix smbd"
+        read -rp "Services: " -a SCORED_SERVICES
+    fi
     echo ""
     ok "Monitoring services: ${SCORED_SERVICES[*]}"
     echo ""

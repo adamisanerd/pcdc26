@@ -41,6 +41,19 @@ STATE_DIR="$LOGDIR/netstate"
 mkdir -p "$LOGDIR" "$STATE_DIR"
 exec > >(tee -a "$LOGFILE") 2>&1
 
+# ============================================================
+# COMPETITION CONFIG (load if available — sets OOB trust rules)
+# ============================================================
+is_trusted_infrastructure() { return 1; }           # stub — overridden by config
+infra_note() { echo -e "${CYN}[INFO]${NC}     [INFRA] $1"; }
+OOB_PREFIX="${OOB_PREFIX:-192.168.40}"
+SCORING_ENGINE_IP="${SCORING_ENGINE_IP:-192.168.20.10}"
+
+_CONF_FILE="$(dirname "$(readlink -f "$0")")/pcdc_competition_config.sh"
+# shellcheck source=pcdc_competition_config.sh
+[ -f "$_CONF_FILE" ] && source "$_CONF_FILE"
+unset _CONF_FILE
+
 ok()      { echo -e "${GRN}[OK]${NC}      $1"; }
 warn()    { echo -e "${YLW}[WARN]${NC}    $1"; }
 alert()   { echo -e "${RED}[ALERT]${NC}   $1"; }
@@ -188,11 +201,22 @@ cp "$STATE_DIR/live_ips_$TIMESTAMP.txt" "$STATE_DIR/live_ips.baseline" 2>/dev/nu
 # ============================================================
 section "STEP 2: HOST ACCOUNTING vs BLUE TEAM PACKET"
 
-echo -e "${YLW}Enter the IP addresses listed in your Blue Team Packet.${NC}"
+# Pre-populate with known competition infrastructure from config.
+# These are always present and must not be flagged as unexpected.
+KNOWN_HOSTS=()
+if [ -n "${COMP_TRUSTED_HOSTS[*]:-}" ]; then
+    for _th in "${COMP_TRUSTED_HOSTS[@]}"; do
+        KNOWN_HOSTS+=("$_th")
+    done
+    infra_note "Pre-loaded ${#COMP_TRUSTED_HOSTS[@]} trusted host(s) from competition config."
+fi
+
+echo -e "${YLW}Enter IP addresses listed in your Blue Team Packet (your own machines).${NC}"
 echo -e "${YLW}One per line. Empty line when done.${NC}"
+[ -n "$OOB_NETWORK" ] && \
+    echo -e "${CYN}Note: OOB network $OOB_NETWORK is auto-trusted — do not re-enter those IPs.${NC}"
 echo ""
 
-KNOWN_HOSTS=()
 while true; do
     read -rp "  Known host IP (or Enter to finish): " host
     [ -z "$host" ] && break
@@ -217,6 +241,8 @@ while read discovered_ip; do
 
     if $is_known; then
         ok "ACCOUNTED FOR: $discovered_ip"
+    elif is_trusted_infrastructure "$discovered_ip"; then
+        infra_note "COMPETITION INFRASTRUCTURE: $discovered_ip (OOB/scoring — expected, do not block)"
     else
         warn "UNACCOUNTED HOST: $discovered_ip — not in your Blue Team Packet"
         warn "  Could be: Gold Team scoring engine, White Team, other Blue Teams,"
@@ -250,6 +276,10 @@ echo ""
 YOUR_HOSTS=()
 for known in "${KNOWN_HOSTS[@]}"; do
     [ "$known" = "$MY_IP" ] && continue
+    if is_trusted_infrastructure "$known"; then
+        infra_note "Skipping trusted infrastructure in detailed scan selection: $known"
+        continue
+    fi
     read -rp "  Include $known in detailed scan? [y/N]: " ans
     [[ "$ans" =~ ^[Yy]$ ]] && YOUR_HOSTS+=("$known")
 done
@@ -461,8 +491,12 @@ if [ -f "$STATE_DIR/live_ips.baseline" ]; then
 
     if [ -n "$new_hosts" ]; then
         alert "NEW HOSTS APPEARED since baseline:"
-        echo "$new_hosts" | while read ip; do
-            alert "  $ip — investigate immediately"
+        echo "$new_hosts" | while read -r ip; do
+            if is_trusted_infrastructure "$ip"; then
+                infra_note "  $ip — trusted OOB/scoring infrastructure"
+            else
+                alert "  $ip — investigate immediately"
+            fi
         done
     else
         ok "No new hosts appeared"

@@ -41,6 +41,28 @@ LOGFILE="$LOGDIR/soceng_$TIMESTAMP.log"
 mkdir -p "$LOGDIR"
 exec > >(tee -a "$LOGFILE") 2>&1
 
+# ============================================================
+# COMPETITION CONFIG (load if available)
+# ============================================================
+_CONF_FILE="$(dirname "$(readlink -f "$0")")/pcdc_competition_config.sh"
+# shellcheck source=pcdc_competition_config.sh
+[ -f "$_CONF_FILE" ] && source "$_CONF_FILE"
+unset _CONF_FILE
+
+HELPDESK_URL="${HELPDESK_URL:-http://helpdesk.pcdc.local:8065/login}"
+CEO_USER="${CEO_USER:-dark.helmet}"
+if [ "${#KNOWN_DOMAIN_USERS[@]}" -eq 0 ]; then
+    KNOWN_DOMAIN_USERS=(
+        "dark.helmet"
+        "princess"
+        "jeffrey.sanders"
+        "ziegler"
+        "steven"
+        "jordan"
+        "sweeney"
+    )
+fi
+
 ok()     { echo -e "${GRN}[OK]${NC}     $1"; }
 warn()   { echo -e "${YLW}[WARN]${NC}   $1"; }
 alert()  { echo -e "${RED}[ALERT]${NC}  $1"; }
@@ -61,6 +83,8 @@ section "INJECT / REQUEST VALIDATION CHECKLIST"
 
 echo -e "${YLW}Run this checklist for EVERY inject or unusual request.${NC}"
 echo -e "${YLW}Answer honestly. If ANY answer is NO — pause before acting.${NC}"
+echo -e "${CYN}Official escalation channel: ${HELPDESK_URL}${NC}"
+echo -e "${CYN}High-risk impersonation target account: ${CEO_USER}${NC}"
 echo ""
 
 INJECT_PASSED=true
@@ -134,6 +158,7 @@ SE_EMAIL_PATTERNS=(
     "verify.*now"
     "click.*here"
     "attachment"
+    "$CEO_USER"
 )
 
 for logfile in "${MAIL_LOGS[@]}"; do
@@ -145,6 +170,19 @@ for logfile in "${MAIL_LOGS[@]}"; do
         matches=$(grep -i "$pattern" "$logfile" 2>/dev/null | tail -5)
         if [ -n "$matches" ]; then
             warn "SE pattern '$pattern' in mail log:"
+            echo "$matches"
+        fi
+    done
+done
+
+echo ""
+info "Checking for spoof/impersonation of known employee accounts..."
+for logfile in "${MAIL_LOGS[@]}"; do
+    [ ! -f "$logfile" ] && continue
+    for known_user in "${KNOWN_DOMAIN_USERS[@]}"; do
+        matches=$(grep -i "$known_user" "$logfile" 2>/dev/null | tail -3)
+        if [ -n "$matches" ]; then
+            warn "Mentions of known user '$known_user' in mail log — verify sender authenticity:"
             echo "$matches"
         fi
     done

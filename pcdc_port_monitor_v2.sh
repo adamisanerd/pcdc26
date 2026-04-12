@@ -56,6 +56,19 @@ STATE_DIR="$LOGDIR/portstate_v2"
 mkdir -p "$LOGDIR" "$STATE_DIR"
 exec > >(tee -a "$LOGFILE") 2>&1
 
+# ============================================================
+# COMPETITION CONFIG (load if available — sets OOB trust rules)
+# ============================================================
+is_trusted_infrastructure() { return 1; }           # stub — overridden by config
+infra_note() { echo -e "${CYN}[INFO]${NC}     [INFRA] $1"; }
+OOB_PREFIX="${OOB_PREFIX:-192.168.40}"
+SCORING_ENGINE_IP="${SCORING_ENGINE_IP:-192.168.20.10}"
+
+_CONF_FILE="$(dirname "$(readlink -f "$0")")/pcdc_competition_config.sh"
+# shellcheck source=pcdc_competition_config.sh
+[ -f "$_CONF_FILE" ] && source "$_CONF_FILE"
+unset _CONF_FILE
+
 ok()      { echo -e "${GRN}[OK]${NC}      $1"; }
 warn()    { echo -e "${YLW}[WARN]${NC}    $1"; }
 alert()   {
@@ -427,9 +440,13 @@ check_tunneling_v2() {
     # We track established connections across cycles and flag ones that persist
     # with consistent re-connection patterns
     ss -tnp state established 2>/dev/null | awk 'NR>1 {print $5}' | \
-        rev | cut -d: -f2- | rev | sort | uniq -c | sort -rn | while read count ip; do
+        rev | cut -d: -f2- | rev | sort | uniq -c | sort -rn | while read -r count ip; do
         if [ "$count" -gt 3 ]; then
-            warn "Repeated connections from $ip ($count sessions) — check for C2 beaconing"
+            if is_trusted_infrastructure "$ip"; then
+                infra_note "Multiple sessions from OOB/scoring $ip ($count) — expected for scoring checks"
+            else
+                warn "Repeated connections from $ip ($count sessions) — check for C2 beaconing"
+            fi
         fi
     done
 
@@ -446,7 +463,11 @@ check_tunneling_v2() {
             case "$f_port" in
                 3306|5432|6379|27017|8080|8443|8888|9000) ;;  # known high ports
                 *)
-                    warn "Outbound to $f_ip:$f_port (from local port $l_port)"
+                    if is_trusted_infrastructure "$f_ip"; then
+                        infra_note "OOB/scoring outbound: $f_ip:$f_port (expected)"
+                    else
+                        warn "Outbound to $f_ip:$f_port (from local port $l_port)"
+                    fi
                     ;;
             esac
         fi
