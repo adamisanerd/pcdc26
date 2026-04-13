@@ -97,7 +97,8 @@ That is the minimum loop to stay alive and keep points.
 3. Update `pcdc_competition_config.sh`.
 4. Deploy and verify recovery (`pcdc_recovery_access.sh` -> `pcdc_recovery_check.sh`).
 5. Baseline then harden (`pcdc_network_enum.sh`, `pcdc_linux_audit.sh`, `pcdc_win_audit.ps1`, then hardening scripts).
-6. Start the continuous loop in Section 3.
+6. On Linux boxes, immediately verify scored services: `pcdc_scored_service_validate.sh`.
+7. Start the continuous loop in Section 3.
 
 ---
 
@@ -106,7 +107,7 @@ That is the minimum loop to stay alive and keep points.
 - Recovery access first. Hardening second.
 - Baseline first. Anomaly loops second.
 - Keep one backup admin session open during firewall/SSH changes.
-- Verify scored services after every hardening change.
+- Verify scored services after every hardening change (`pcdc_scored_service_validate.sh`).
 - Treat social-engineering injects as incidents until validated (`pcdc_soceng_defense.sh`).
 
 ---
