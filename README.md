@@ -1783,6 +1783,41 @@ when someone is actively trying to hack your asteroid mining colony.
 
 ---
 
+## 🧪 No-VM Container Chaos Validation
+*(Break things safely, verify detections, throw container away)*
+
+If you can't run a dedicated Ubuntu VM, use the disposable container harness:
+
+```bash
+bash tests/test_container_chaos.sh
+```
+
+What this does:
+- pulls a fresh Ubuntu image
+- installs runtime deps in the container only
+- injects intentionally bad states (service misconfigs, rogue account, shell trap poisoning)
+- runs selected defensive scripts and asserts expected detections
+- exits non-zero on failed assertions
+
+Run a specific scenario:
+
+```bash
+bash tests/test_container_chaos.sh --case scored   # pcdc_scored_service_validate.sh checks
+bash tests/test_container_chaos.sh --case audit    # pcdc_linux_audit.sh sees rogue account
+bash tests/test_container_chaos.sh --case alias    # pcdc_alias_detector_v2.sh catches DEBUG trap
+```
+
+Use a different base image:
+
+```bash
+bash tests/test_container_chaos.sh --image ubuntu:24.04
+```
+
+This is not a full replacement for real host testing, but it gives you a repeatable,
+zero-risk regression loop you can run before merging major script changes.
+
+---
+
 ## 📚 Learning Resources
 *(For After the Competition, When Your Hands Stop Shaking)*
 

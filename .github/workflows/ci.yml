@@ -253,3 +253,25 @@ jobs:
         with:
           name: linux-runtime-smoke-logs
           path: .ci-logs/runtime-smoke
+
+  container-chaos-smoke:
+    name: Container chaos smoke (main push)
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    needs: shell-lint-and-syntax
+    permissions:
+      contents: read
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Docker availability
+        run: docker --version
+
+      - name: Run container chaos harness
+        shell: bash
+        run: |
+          chmod +x tests/test_container_chaos.sh
+          bash tests/test_container_chaos.sh --case all
