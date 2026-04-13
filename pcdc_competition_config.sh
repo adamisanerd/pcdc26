@@ -74,6 +74,7 @@ PCDC_DOMAIN="pcdc.local"
 # shellcheck disable=SC2034
 KNOWN_DOMAIN_USERS=(
     "dark.helmet"        # CEO — highest social engineering risk
+    "dotmatrix"          # Packet/diagram credential breadcrumb account
     "princess"
     "jeffrey.sanders"
     "ziegler"
@@ -87,6 +88,17 @@ CEO_USER="dark.helmet"
 CEO_EMAIL="dark.helmet@${TEAM_EMAIL_DOMAIN}"
 # shellcheck disable=SC2034
 GOLDTEAM_PROTECTED_ACCOUNT="goldteam"                    # Explicitly off-limits account
+
+# ============================================================
+# INITIAL CREDENTIAL CANDIDATES (competition breadcrumbs / packet hints)
+# Used only for defensive access validation on YOUR OWN hosts.
+# Do NOT use against unaccounted hosts, OOB, or other teams.
+# ============================================================
+# shellcheck disable=SC2034
+COMP_CRED_CANDIDATES=(
+    "dotmatrix:Assword12345!"
+    "dotmatrix:Password12345!"   # common intentional variant
+)
 
 # ============================================================
 # SCORED SERVICES (from Blue Team Packet service list)
@@ -105,6 +117,35 @@ COMP_SCORED_SERVICES=(
     "vsftpd"       # FTP
     "smbd"         # SMB/CIFS
 )
+
+# ============================================================
+# LIKELY SCORED HOST ROLES (from provided network diagram)
+# These are role hints, not authoritative service checks.
+# Keep this aligned with packet clarifications from Gold Team.
+# ============================================================
+# shellcheck disable=SC2034
+COMP_LIKELY_SCORED_HOST_ROLES=(
+    "domain_controller"
+    "workstation"
+    "wsus"
+    "mail_server"
+    "web_server"
+    "file_server"
+)
+
+# Windows role-based service hints for pcdc_win_monitor.ps1
+# shellcheck disable=SC2034
+WIN_DC_SCORED_SERVICES=("DNS" "NTDS" "Netlogon" "Kdc" "LanmanServer")
+# shellcheck disable=SC2034
+WIN_WSUS_SCORED_SERVICES=("WsusService" "W3SVC" "BITS")
+# shellcheck disable=SC2034
+WIN_WEB_SCORED_SERVICES=("W3SVC")
+# shellcheck disable=SC2034
+WIN_MAIL_SCORED_SERVICES=("MSExchangeIS" "MSExchangeTransport" "W3SVC" "SMTPSVC")
+# shellcheck disable=SC2034
+WIN_FILE_SCORED_SERVICES=("LanmanServer")
+# shellcheck disable=SC2034
+WIN_WORKSTATION_SCORED_SERVICES=("LanmanWorkstation" "Dnscache")
 
 # ============================================================
 # TRUSTED INFRASTRUCTURE HOST LIST
