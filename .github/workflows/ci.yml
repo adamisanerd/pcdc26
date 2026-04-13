@@ -207,7 +207,8 @@ jobs:
         run: |
           mkdir -p .ci-logs/runtime-smoke
           shopt -s nullglob
-          mapfile -t TOPLEVEL_SCRIPTS < <(find . -maxdepth 1 -type f -name "pcdc_*.sh" | sort)
+          # Only execute runnable top-level scripts. Exclude sourced config files.
+          mapfile -t TOPLEVEL_SCRIPTS < <(find . -maxdepth 1 -type f -name "pcdc_*.sh" ! -name "pcdc_competition_config.sh" | sort)
 
           if [ "${#TOPLEVEL_SCRIPTS[@]}" -eq 0 ]; then
             echo "No top-level pcdc_*.sh scripts found."
@@ -219,10 +220,10 @@ jobs:
             base="$(basename "$script")"
             echo "[SMOKE] Running $base"
 
+            rc=0
             timeout 25s bash "$script" </dev/null \
               > ".ci-logs/runtime-smoke/${base}.out.log" \
-              2> ".ci-logs/runtime-smoke/${base}.err.log"
-            rc=$?
+              2> ".ci-logs/runtime-smoke/${base}.err.log" || rc=$?
 
             case "$rc" in
               0)
