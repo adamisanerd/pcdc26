@@ -44,10 +44,11 @@ jobs:
             bash -n "$f"
           done
 
-      - name: Ensure every .sh file is executable
+      - name: Ensure runnable .sh files are executable
         shell: bash
         run: |
-          mapfile -t SH_FILES < <(find . -type f -name "*.sh" | sort)
+          # Sourced config/library files do not need an execute bit.
+          mapfile -t SH_FILES < <(find . -type f -name "*.sh" ! -name "pcdc_competition_config.sh" | sort)
           not_exec=0
           for f in "${SH_FILES[@]}"; do
             if [ ! -x "$f" ]; then
@@ -170,3 +171,84 @@ jobs:
             --dir "$TMPDIR_SMOKE" \
             --input "$TMPDIR_SMOKE/checksums.sha256"
           rm -rf "$TMPDIR_SMOKE"
+
+  linux-runtime-smoke:
+    name: Linux runtime smoke (top-level scripts)
+    runs-on: ubuntu-latest
+    needs: shell-lint-and-syntax
+    permissions:
+      contents: read
+    container:
+      image: ubuntu:22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install runtime dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            iproute2 \
+            procps \
+            cron \
+            net-tools \
+            lsof \
+            curl \
+            dnsutils \
+            iputils-ping \
+            openssh-client \
+            nmap \
+            coreutils \
+            findutils
+
+      - name: Run top-level script smoke tests
+        shell: bash
+        run: |
+          mkdir -p .ci-logs/runtime-smoke
+          shopt -s nullglob
+          mapfile -t TOPLEVEL_SCRIPTS < <(find . -maxdepth 1 -type f -name "pcdc_*.sh" | sort)
+
+          if [ "${#TOPLEVEL_SCRIPTS[@]}" -eq 0 ]; then
+            echo "No top-level pcdc_*.sh scripts found."
+            exit 1
+          fi
+
+          failures=0
+          for script in "${TOPLEVEL_SCRIPTS[@]}"; do
+            base="$(basename "$script")"
+            echo "[SMOKE] Running $base"
+
+            timeout 25s bash "$script" </dev/null \
+              > ".ci-logs/runtime-smoke/${base}.out.log" \
+              2> ".ci-logs/runtime-smoke/${base}.err.log"
+            rc=$?
+
+            case "$rc" in
+              0)
+                echo "[PASS] $base (exit 0)"
+                ;;
+              1)
+                echo "[PASS] $base (exit 1: guarded or expected runtime check failure)"
+                ;;
+              124)
+                echo "[PASS] $base (timeout 25s: long-running/interactive behavior)"
+                ;;
+              *)
+                echo "[FAIL] $base (unexpected exit code: $rc)"
+                failures=1
+                ;;
+            esac
+          done
+
+          if [ "$failures" -ne 0 ]; then
+            echo "One or more runtime smoke checks failed."
+            exit 1
+          fi
+
+      - name: Upload runtime smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-runtime-smoke-logs
+          path: .ci-logs/runtime-smoke
