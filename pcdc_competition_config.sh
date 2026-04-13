@@ -7,8 +7,8 @@
 #  Each monitoring script sources it automatically when found
 #  in the same directory.
 #
-#  BEFORE COMPETITION: update TEAM_NUMBER and the host/service
-#  lists to match your Blue Team Packet exactly.
+#  BEFORE COMPETITION: update TEAM_NAME (and optional domain/
+#  host/service lists) to match your Blue Team Packet exactly.
 # ============================================================
 
 # Guard against direct execution
@@ -24,9 +24,13 @@ fi
 # ============================================================
 # TEAM IDENTITY — UPDATE BEFORE COMPETITION
 # ============================================================
-TEAM_NUMBER="XX"      # REPLACE with assigned number from packet (e.g., 05, 12)
+# Optional numeric team ID (leave empty when your event uses only team/company names)
+TEAM_NUMBER=""
 # shellcheck disable=SC2034
 TEAM_NAME="ASTRA 9"
+# Optional: set your internal email/webmail domain if different
+# shellcheck disable=SC2034
+TEAM_EMAIL_DOMAIN="pcdc.local"
 
 # ============================================================
 # NETWORK TOPOLOGY (from Blue Team Packet)
@@ -51,7 +55,7 @@ SCORING_ENGINE_IP="192.168.20.10"
 # shellcheck disable=SC2034
 HELPDESK_URL="http://helpdesk.pcdc.local:8065/login"     # Mattermost help desk
 # shellcheck disable=SC2034
-EMAIL_URL="https://mail.blue${TEAM_NUMBER}.pcdc.local"    # Webmail for your team
+EMAIL_URL="https://mail.${TEAM_EMAIL_DOMAIN}"    # Webmail for your team
 # shellcheck disable=SC2034
 PCDC_DOMAIN="pcdc.local"
 
@@ -76,7 +80,7 @@ KNOWN_DOMAIN_USERS=(
 # shellcheck disable=SC2034
 CEO_USER="dark.helmet"
 # shellcheck disable=SC2034
-CEO_EMAIL="dark.helmet@blue${TEAM_NUMBER}.pcdc.local"
+CEO_EMAIL="dark.helmet@${TEAM_EMAIL_DOMAIN}"
 
 # ============================================================
 # SCORED SERVICES (from Blue Team Packet service list)
