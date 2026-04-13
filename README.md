@@ -1783,6 +1783,53 @@ when someone is actively trying to hack your asteroid mining colony.
 
 ---
 
+## 🧪 No-VM Container Chaos Validation
+*(Break things safely, verify detections, throw container away)*
+
+If you can't run a dedicated Ubuntu VM, use the disposable container harness:
+
+```bash
+bash tests/test_container_chaos.sh
+```
+
+What this does:
+- pulls a fresh Ubuntu image
+- installs runtime deps in the container only
+- injects intentionally bad states (service misconfigs, rogue account, shell trap poisoning)
+- runs selected defensive scripts and asserts expected detections
+- exits non-zero on failed assertions
+
+Run a specific scenario:
+
+```bash
+bash tests/test_container_chaos.sh --case scored   # pcdc_scored_service_validate.sh checks
+bash tests/test_container_chaos.sh --case audit    # pcdc_linux_audit.sh sees rogue account
+bash tests/test_container_chaos.sh --case alias    # pcdc_alias_detector_v2.sh catches DEBUG trap
+bash tests/test_container_chaos.sh --case webapp   # pcdc_webapp_audit.sh detects webshell/sensitive files
+bash tests/test_container_chaos.sh --case privesc  # pcdc_privesc_detector.sh flags critical perms
+bash tests/test_container_chaos.sh --case incident # pcdc_incident_report.sh report generation
+bash tests/test_container_chaos.sh --case soceng   # pcdc_soceng_defense.sh checklist path
+bash tests/test_container_chaos.sh --case network  # pcdc_network_enum.sh scripted minimal run
+bash tests/test_container_chaos.sh --case smoke    # best-effort timeout smoke for hard-to-assert scripts
+```
+
+Use a different base image:
+
+```bash
+bash tests/test_container_chaos.sh --image ubuntu:24.04
+```
+
+This is not a full replacement for real host testing, but it gives you a repeatable,
+zero-risk regression loop you can run before merging major script changes.
+
+The harness intentionally uses two layers:
+- deterministic assertions for scripts that are safe and automatable in a disposable container
+- timeout-based smoke checks for highly interactive or long-running scripts
+
+See exact per-script coverage: [tests/CHAOS_COVERAGE.md](tests/CHAOS_COVERAGE.md)
+
+---
+
 ## 📚 Learning Resources
 *(For After the Competition, When Your Hands Stop Shaking)*
 
