@@ -18,10 +18,14 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     exit 1
 fi
 
+# All variables in this file are intentionally used by sourcing scripts.
+# shellcheck disable=SC2034
+
 # ============================================================
 # TEAM IDENTITY — UPDATE BEFORE COMPETITION
 # ============================================================
 TEAM_NUMBER="XX"      # REPLACE with assigned number from packet (e.g., 05, 12)
+# shellcheck disable=SC2034
 TEAM_NAME="ASTRA 9"
 
 # ============================================================
@@ -34,6 +38,7 @@ TEAM_NAME="ASTRA 9"
 # ============================================================
 
 # Out-of-band (OOB) management network — Gold Team / White Team / Scoring
+# shellcheck disable=SC2034
 OOB_NETWORK="192.168.40.0/24"
 OOB_PREFIX="192.168.40"          # prefix used for glob matching in trust checks
 
@@ -43,6 +48,7 @@ SCORING_ENGINE_IP="192.168.20.10"
 # ============================================================
 # COMPETITION INFRASTRUCTURE URLs
 # ============================================================
+# shellcheck disable=SC2034
 HELPDESK_URL="http://helpdesk.pcdc.local:8065/login"     # Mattermost help desk
 # shellcheck disable=SC2034
 EMAIL_URL="https://mail.blue${TEAM_NUMBER}.pcdc.local"    # Webmail for your team
@@ -67,6 +73,7 @@ KNOWN_DOMAIN_USERS=(
     "jordan"
     "sweeney"
 )
+# shellcheck disable=SC2034
 CEO_USER="dark.helmet"
 # shellcheck disable=SC2034
 CEO_EMAIL="dark.helmet@blue${TEAM_NUMBER}.pcdc.local"
@@ -94,7 +101,6 @@ COMP_SCORED_SERVICES=(
 # Pre-populated into network enumeration as "known" hosts so
 # they don't trigger "unaccounted host" alerts.
 # ============================================================
-# shellcheck disable=SC2034
 COMP_TRUSTED_HOSTS=(
     "$SCORING_ENGINE_IP"
     # Add static OOB host IPs here as you discover them:
