@@ -18,6 +18,9 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     exit 1
 fi
 
+# All variables in this file are intentionally used by sourcing scripts.
+# shellcheck disable=SC2034
+
 # ============================================================
 # TEAM IDENTITY — UPDATE BEFORE COMPETITION
 # ============================================================
@@ -44,9 +47,7 @@ SCORING_ENGINE_IP="192.168.20.10"
 # COMPETITION INFRASTRUCTURE URLs
 # ============================================================
 HELPDESK_URL="http://helpdesk.pcdc.local:8065/login"     # Mattermost help desk
-# shellcheck disable=SC2034
 EMAIL_URL="https://mail.blue${TEAM_NUMBER}.pcdc.local"    # Webmail for your team
-# shellcheck disable=SC2034
 PCDC_DOMAIN="pcdc.local"
 
 # ============================================================
@@ -57,7 +58,6 @@ PCDC_DOMAIN="pcdc.local"
 # any inject claiming to be from this account should be
 # validated via the Mattermost help desk before acting on it.
 # ============================================================
-# shellcheck disable=SC2034
 KNOWN_DOMAIN_USERS=(
     "dark.helmet"        # CEO — highest social engineering risk
     "princess"
@@ -68,7 +68,6 @@ KNOWN_DOMAIN_USERS=(
     "sweeney"
 )
 CEO_USER="dark.helmet"
-# shellcheck disable=SC2034
 CEO_EMAIL="dark.helmet@blue${TEAM_NUMBER}.pcdc.local"
 
 # ============================================================
@@ -76,7 +75,6 @@ CEO_EMAIL="dark.helmet@blue${TEAM_NUMBER}.pcdc.local"
 # Update to match exactly what your packet says is scored.
 # These are pre-populated into the monitor's service watchlist.
 # ============================================================
-# shellcheck disable=SC2034
 COMP_SCORED_SERVICES=(
     "apache2"      # HTTP web server
     "nginx"        # HTTP web server (alternate)
@@ -94,7 +92,6 @@ COMP_SCORED_SERVICES=(
 # Pre-populated into network enumeration as "known" hosts so
 # they don't trigger "unaccounted host" alerts.
 # ============================================================
-# shellcheck disable=SC2034
 COMP_TRUSTED_HOSTS=(
     "$SCORING_ENGINE_IP"
     # Add static OOB host IPs here as you discover them:
