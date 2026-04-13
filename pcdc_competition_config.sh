@@ -55,6 +55,10 @@ SCORING_ENGINE_IP="192.168.20.10"
 # shellcheck disable=SC2034
 HELPDESK_URL="http://helpdesk.pcdc.local:8065/login"     # Mattermost help desk
 # shellcheck disable=SC2034
+PASSBOLT_URL="http://192.168.40.111"                     # OOB password vault
+# shellcheck disable=SC2034
+GOLDTEAM_EMAIL_SERVER_URL="http://192.168.40.13"         # OOB Gold Team email server
+# shellcheck disable=SC2034
 EMAIL_URL="https://mail.${TEAM_EMAIL_DOMAIN}"    # Webmail for your team
 # shellcheck disable=SC2034
 PCDC_DOMAIN="pcdc.local"
@@ -81,6 +85,8 @@ KNOWN_DOMAIN_USERS=(
 CEO_USER="dark.helmet"
 # shellcheck disable=SC2034
 CEO_EMAIL="dark.helmet@${TEAM_EMAIL_DOMAIN}"
+# shellcheck disable=SC2034
+GOLDTEAM_PROTECTED_ACCOUNT="goldteam"                    # Explicitly off-limits account
 
 # ============================================================
 # SCORED SERVICES (from Blue Team Packet service list)
@@ -107,6 +113,8 @@ COMP_SCORED_SERVICES=(
 # ============================================================
 COMP_TRUSTED_HOSTS=(
     "$SCORING_ENGINE_IP"
+    "192.168.40.111"   # Passbolt (OOB)
+    "192.168.40.13"    # Gold Team Email (OOB)
     # Add static OOB host IPs here as you discover them:
     # "192.168.40.1"   # OOB gateway
     # "192.168.40.10"  # White Team monitor
