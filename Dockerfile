@@ -113,6 +113,7 @@ COPY tmux.conf /root/.tmux.conf
 
 # ── Entrypoint script ─────────────────────────────────────────
 COPY entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh /root/.blueTeam_profile /opt/blueTeam/scripts/*.sh
 RUN chmod +x /entrypoint.sh
 
 # ── Healthcheck — verifies key tools are available ───────────
