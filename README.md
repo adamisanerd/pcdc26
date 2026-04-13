@@ -383,6 +383,33 @@ sudo bash pcdc_linux_harden.sh
 
 ---
 
+### ✅ `pcdc_scored_service_validate.sh`
+**Read-only scored-service validation. Run this right after hardening.**
+
+This checks whether likely scored services are installed, running, listening,
+and obviously misconfigured in ways that get you yelled at by the scoreboard.
+
+It does **not** change configs, restart services, or touch the firewall.
+That makes it safe to use as the "did I break the point box?" checkpoint
+between `pcdc_linux_harden.sh` and `pcdc_linux_monitor.sh`.
+
+**What it validates:**
+- Service presence and running state for likely Linux scored services
+- Expected listening ports for web, SSH, mail, DNS, DB, FTP, and SMB roles
+- Broad exposure warnings for services like MySQL, SMB, and FTP
+- Obvious risky defaults in `apache2`, `nginx`, `sshd`, `postfix`, `named`, `mysql`/`mariadb`, `vsftpd`, and `smbd`
+- A clean operator checkpoint before you leave the host on continuous monitor duty
+
+**Usage:**
+```bash
+sudo bash pcdc_scored_service_validate.sh
+
+# Or check only the services you care about on this host
+sudo bash pcdc_scored_service_validate.sh sshd nginx
+```
+
+---
+
 ### 👁️ `pcdc_linux_monitor.sh`
 **Continuous system monitor. It never sleeps. It never blinks. It watches.**
 
@@ -1389,6 +1416,7 @@ Bring both directories to your end-of-day presentation.
 | `pcdc_securityonion.sh` | NSM Bridge | T+0:00 status, then monitor | Linux admin machine |
 | `pcdc_linux_audit.sh` | Audit | T+0:00, once per machine | Linux targets |
 | `pcdc_linux_harden.sh` | Hardening | T+0:05, after audit | Linux targets |
+| `pcdc_scored_service_validate.sh` | Validation | T+0:08, after hardening and after major service changes | Linux targets |
 | `pcdc_alias_detector_v2.sh` | Detection | T+0:10, then every 30 min | Linux targets |
 | `pcdc_webapp_audit.sh` | Detection | T+0:10, then every 30 min | Linux targets |
 | `pcdc_privesc_detector.sh` | Detection | T+0:10, then every 30 min | Linux targets |
