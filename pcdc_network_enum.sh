@@ -66,6 +66,28 @@ section() {
     echo ""
 }
 
+port_open_quick() {
+    local ip="$1" port="$2"
+    timeout 2 bash -c "echo >/dev/tcp/$ip/$port" 2>/dev/null
+}
+
+try_ssh_cred() {
+    local ip="$1" user="$2" pass="$3"
+    command -v sshpass >/dev/null 2>&1 || return 2
+    timeout 6 sshpass -p "$pass" ssh \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o LogLevel=ERROR \
+        -o ConnectTimeout=4 \
+        "$user@$ip" "exit" >/dev/null 2>&1
+}
+
+try_smb_cred() {
+    local ip="$1" user="$2" pass="$3"
+    command -v smbclient >/dev/null 2>&1 || return 2
+    timeout 6 smbclient -L "//$ip" -U "$user%$pass" -g >/dev/null 2>&1
+}
+
 if [[ $EUID -ne 0 ]]; then
     echo -e "${YLW}Warning: Running without root. OS detection and SYN scan unavailable.${NC}"
     echo -e "${YLW}Re-run with sudo for full results.${NC}"
@@ -289,6 +311,57 @@ YOUR_HOSTS+=("$MY_IP")
 
 echo ""
 info "Scanning ${#YOUR_HOSTS[@]} hosts in detail..."
+
+# Optional credential probe against known in-scope hosts only.
+# This helps quickly validate breadcrumb/packet credentials.
+if [ "${#COMP_CRED_CANDIDATES[@]}" -gt 0 ]; then
+    section "STEP 3A: OPTIONAL CREDENTIAL VALIDATION (YOUR HOSTS ONLY)"
+    warn "Credential checks will run ONLY against hosts you selected as YOUR machines."
+    warn "Unaccounted/OOB hosts are intentionally excluded for competition safety."
+    read -rp "Run credential validation now? [y/N]: " run_cred_check
+
+    if [[ "$run_cred_check" =~ ^[Yy]$ ]]; then
+        ssh_checked=0
+        smb_checked=0
+        ssh_hits=0
+        smb_hits=0
+
+        for target_ip in "${YOUR_HOSTS[@]}"; do
+            [ "$target_ip" = "$MY_IP" ] && continue
+
+            if port_open_quick "$target_ip" 22; then
+                ssh_checked=$((ssh_checked + 1))
+                for cred in "${COMP_CRED_CANDIDATES[@]}"; do
+                    user="${cred%%:*}"
+                    pass="${cred#*:}"
+                    if try_ssh_cred "$target_ip" "$user" "$pass"; then
+                        ok "SSH credential match: $user@$target_ip"
+                        ssh_hits=$((ssh_hits + 1))
+                        break
+                    fi
+                done
+            fi
+
+            if port_open_quick "$target_ip" 445; then
+                smb_checked=$((smb_checked + 1))
+                for cred in "${COMP_CRED_CANDIDATES[@]}"; do
+                    user="${cred%%:*}"
+                    pass="${cred#*:}"
+                    if try_smb_cred "$target_ip" "$user" "$pass"; then
+                        ok "SMB credential match: $user@$target_ip"
+                        smb_hits=$((smb_hits + 1))
+                        break
+                    fi
+                done
+            fi
+        done
+
+        info "Credential validation summary: SSH hits $ssh_hits/$ssh_checked, SMB hits $smb_hits/$smb_checked"
+        warn "Immediately rotate any validated breadcrumb credential and report domain account changes to Gold Team."
+    else
+        info "Skipping credential validation step."
+    fi
+fi
 
 FULL_SCAN_FILE="$STATE_DIR/full_scan_$TIMESTAMP.txt"
 : > "$FULL_SCAN_FILE"

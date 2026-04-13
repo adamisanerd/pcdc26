@@ -68,34 +68,36 @@ Reference: `pcdc_admin_setup.sh` installs/admin-preps your environment; `source 
 
 ---
 
-## 3) Competition timeline by phase
+## 3) Fastest path if you're already stabilized
 
-| Phase | Time window | What to run | Where |
-|---|---|---|---|
-| Bring-up | T-24h to T-30m | `container_run.sh` (`build`, `run`) or `pcdc_admin_setup.sh`, then update `pcdc_competition_config.sh` | Admin workstation/container |
-| Access resilience | T-30m to T+10m | `bt_push_key_all`, `bt_run_all pcdc_recovery_access.sh`, `pcdc_recovery_check.sh` | Admin -> Linux targets |
-| Baseline | T+0 to T+20m | `pcdc_network_enum.sh`, `pcdc_linux_audit.sh`, `pcdc_win_audit.ps1` (+ `pcdc_win_ad_audit.ps1` if AD exists) | Admin + targets |
-| Hardening | T+15m to T+45m | `pcdc_linux_harden.sh`, `pcdc_win_harden.ps1` | Linux/Windows targets |
-| Continuous detect | T+30m onward | `pcdc_linux_monitor.sh 45`, `pcdc_port_monitor_v2.sh --paranoid`, `pcdc_win_monitor.ps1 -Interval 45` | Each target host |
-| Recurring checks | Every 30-45m | `pcdc_recovery_check.sh`, `pcdc_alias_detector_v2.sh`, `pcdc_webapp_audit.sh`, `pcdc_privesc_detector.sh` | Admin + targets |
-| Incident branch | Triggered anytime | `pcdc_runbook.sh triage`, `pcdc_incident_report.sh`, `pcdc_soceng_defense.sh` | Affected host + admin |
+If you're already enumerated, passwords are rotated, persistence/recovery is in place, and hardening is done, run this:
+
+1. Start continuous monitoring on every host:
+   - Linux: `pcdc_linux_monitor.sh 45`
+   - Linux network: `pcdc_port_monitor_v2.sh --paranoid`
+   - Windows: `pcdc_win_monitor.ps1 -Interval 45`
+2. Every 30-45 minutes, run a sweep:
+   - `pcdc_recovery_check.sh`
+   - `pcdc_alias_detector_v2.sh`
+   - `pcdc_webapp_audit.sh`
+   - `pcdc_privesc_detector.sh`
+3. On any high-confidence alert:
+   - `pcdc_runbook.sh triage`
+   - `pcdc_incident_report.sh`
+   - `pcdc_soceng_defense.sh` (for suspicious inject/email requests)
+
+That is the minimum loop to stay alive and keep points.
 
 ---
 
-## 4) Do-this-now checklist (exact order)
+## 4) Fast bootstrap (if starting from scratch)
 
 1. Build/run admin environment (`container_run.sh`) or run `pcdc_admin_setup.sh`.
-2. Load wrappers: `source ~/.blueTeam_profile`.
-3. Add hosts (`bt_add_host`) and push keys (`bt_push_key_all`).
-4. Update `pcdc_competition_config.sh` (trusted infra + scored services).
-5. Deploy recovery (`bt_run_all pcdc_recovery_access.sh`).
-6. Verify recovery (`pcdc_recovery_check.sh`) **before** hardening.
-7. Baseline: `pcdc_network_enum.sh`, `bt_run_all pcdc_linux_audit.sh`, `pcdc_win_audit.ps1`.
-8. Harden: `bt_run_all pcdc_linux_harden.sh`, then `pcdc_win_harden.ps1`.
-9. Start monitoring loops on all hosts:
-   - Linux: `pcdc_linux_monitor.sh 45` + `pcdc_port_monitor_v2.sh --paranoid`
-   - Windows: `pcdc_win_monitor.ps1 -Interval 45`
-10. Every 30-45 minutes rerun recovery + alias/web/privesc checks; on alerts run `pcdc_runbook.sh triage`.
+2. Add hosts + push keys (`bt_add_host`, `bt_push_key_all`).
+3. Update `pcdc_competition_config.sh`.
+4. Deploy and verify recovery (`pcdc_recovery_access.sh` -> `pcdc_recovery_check.sh`).
+5. Baseline then harden (`pcdc_network_enum.sh`, `pcdc_linux_audit.sh`, `pcdc_win_audit.ps1`, then hardening scripts).
+6. Start the continuous loop in Section 3.
 
 ---
 

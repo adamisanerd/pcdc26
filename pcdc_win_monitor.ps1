@@ -23,6 +23,7 @@
 #  USAGE:
 #    Set-ExecutionPolicy Bypass -Scope Process -Force
 #    .\pcdc_win_monitor.ps1 [-Interval 45] [-Services "w3svc","mssqlserver"]
+#    .\pcdc_win_monitor.ps1 [-Role Auto|DomainController|WSUS|Web|Mail|File|Workstation]
 #
 #  Run as Administrator for full visibility.
 # ============================================================
@@ -32,6 +33,8 @@
 param(
     [int]$Interval = 45,
     [string[]]$Services = @(),
+    [ValidateSet("Auto","DomainController","WSUS","Web","Mail","File","Workstation")]
+    [string]$Role = "Auto",
     [string]$OutputPath = "$env:TEMP\blueTeam"
 )
 
@@ -75,13 +78,40 @@ Src IP:   $srcIP
     Write-Host "[INCIDENT LOGGED] $type" -ForegroundColor Red
 }
 
-# ── Prompt for scored services if not provided ────────────────
-if ($Services.Count -eq 0) {
-    Write-Host "Enter your scored Windows service names (space-separated)." -ForegroundColor Yellow
-    Write-Host "Examples: w3svc dns mssqlserver smb lanmanserver" -ForegroundColor Yellow
-    $input = Read-Host "Scored services"
-    $Services = $input -split "\s+"
+function Resolve-RoleServices {
+    param(
+        [string]$RoleName,
+        [string]$ComputerName
+    )
+
+    switch ($RoleName) {
+        "DomainController" { return @("DNS", "NTDS", "Netlogon", "Kdc", "LanmanServer") }
+        "WSUS"             { return @("WsusService", "W3SVC", "BITS") }
+        "Web"              { return @("W3SVC") }
+        "Mail"             { return @("MSExchangeIS", "MSExchangeTransport", "W3SVC", "SMTPSVC") }
+        "File"             { return @("LanmanServer") }
+        "Workstation"      { return @("LanmanWorkstation", "Dnscache") }
+        default {
+            $name = $ComputerName.ToLowerInvariant()
+            if ($name -match "dc|domain")        { return @("DNS", "NTDS", "Netlogon", "Kdc", "LanmanServer") }
+            if ($name -match "wsus|update")      { return @("WsusService", "W3SVC", "BITS") }
+            if ($name -match "web|iis")          { return @("W3SVC") }
+            if ($name -match "mail|exchange")    { return @("MSExchangeIS", "MSExchangeTransport", "W3SVC", "SMTPSVC") }
+            if ($name -match "file|fileserver|fs") { return @("LanmanServer") }
+            if ($name -match "workstation|client|ws") { return @("LanmanWorkstation", "Dnscache") }
+            return @("W3SVC", "DNS", "LanmanServer")
+        }
+    }
 }
+
+# ── Resolve scored services ───────────────────────────────────
+if ($Services.Count -eq 0) {
+    $Services = Resolve-RoleServices -RoleName $Role -ComputerName $env:COMPUTERNAME
+    Write-Warn "No -Services supplied. Auto-selected role-based defaults for Role=$Role on host $env:COMPUTERNAME"
+    Write-Warn "Override explicitly with -Services \"w3svc\",\"dns\" if your packet differs."
+}
+
+$Services = @($Services | Where-Object { $_ -and $_.Trim().Length -gt 0 } | Select-Object -Unique)
 Write-Info "Monitoring services: $($Services -join ', ')"
 
 # ============================================================
